@@ -23,5 +23,13 @@ database URL. Never run a downgrade against a non-disposable database.
 Database tests require `TEST_DATABASE_URL` to point to a genuinely disposable
 PostgreSQL database named with an `_test` suffix, plus
 `TEST_DATABASE_DISPOSABLE=1`. Tests create and drop a private schema there. The
-flag and suffix alone do not make a database disposable. Missing settings fail
-the tests rather than skipping them.
+flag and suffix alone do not make a database disposable. Tests that create and
+drop temporary PostgreSQL login roles also require a genuinely disposable cluster
+and `TEST_PG_CLUSTER_DISPOSABLE=1`, since roles are cluster-wide. Missing settings
+fail the tests rather than skipping them. Never point them at a shared cluster.
+
+Migrations must run with a DDL-capable PostgreSQL principal able to create or
+validate the non-login `hpb_app` role. The service must instead use a separate,
+unprivileged login that inherits `hpb_app`. At startup the service verifies that
+its login and effective role cannot mutate the activity log or own its table,
+schema or database; unsafe or unavailable database access aborts startup.
