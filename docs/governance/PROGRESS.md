@@ -142,7 +142,7 @@ Security-boundary choices must follow the specification's owner-decision process
 
 | Task | Target | Status | Required outcome |
 |---|---|---|---|
-| PB4-FU01 | PB4 | Not started | Implement a trusted Nginx/proxy boundary so rate limits and audit use the real client IP. Ignore or overwrite externally supplied `X-Forwarded-For` unless it came through an explicitly trusted proxy. Test legitimate proxy forwarding, spoofed external headers and direct/untrusted callers. |
+| PB4-FU01 | PB4 | Not started | Implement a trusted Nginx/proxy boundary so rate limits and audit use the real client IP. Nginx must strip or overwrite externally supplied `X-Forwarded-For` at ingress; the backend may trust forwarding information only from explicitly configured proxy hops. Test legitimate forwarding and spoofed headers both directly and through Nginx. |
 | PB4-FU02 | PB4 | Not started | Define and test a safe local HTTP development cookie flow without weakening production: production session cookies must retain `Secure` and existing protections, and an insecure development setting must not silently apply in production. Document the development boundary and test both environments. |
 | PB2-PB4-FU01 | PB2/PB4 | Not started | Schedule cleanup of expired `auth_login_throttle` rows when the relevant scheduler/infrastructure exists. Use database time and a reviewed bounded policy; test that cleanup does not reset active limits or race concurrent login attempts. |
 | P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
