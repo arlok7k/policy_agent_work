@@ -22,7 +22,7 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 |---|---|---|
 | PB1-R01 | Done locally | Normal short pytest diagnostics and captured output restored; test credentials wrapped; regression retained. Full suite: 131 passed; PR CI pending. |
 | PB1-R02 | Done | DR-002, DR-006, DR-009 and DR-013 approval is marked to be confirmed because exact owner messages are unavailable in the current context. |
-| PB1-R03 | Planned | Track the requested PB2/PB4/P1 operational follow-ups without implementing those phases. |
+| PB1-R03 | Done | The four requested PB2/PB4/P1 follow-ups are tracked below; none has been started. |
 
 PB1-R01's focused output regression passed (4 tests). The first audit flagged two
 nonsecret expected-value literals in its failure probes as secret-keyword false
@@ -135,4 +135,17 @@ host. The CLI error displayed a temporary signed download URL; it is not copied
 here. An optional actions-permissions API lookup also returned HTTP 403; other
 repository, push and workflow-status operations succeeded.
 
-**Next phase:** PB2 remains blocked until PB1 is complete and merged into `main`.
+## Deferred phase follow-ups
+
+These are tracked, not implemented, and do not authorize starting a later phase.
+Security-boundary choices must follow the specification's owner-decision process.
+
+| Task | Target | Status | Required outcome |
+|---|---|---|---|
+| PB4-FU01 | PB4 | Not started | Implement a trusted Nginx/proxy boundary so rate limits and audit use the real client IP. Ignore or overwrite externally supplied `X-Forwarded-For` unless it came through an explicitly trusted proxy. Test legitimate proxy forwarding, spoofed external headers and direct/untrusted callers. |
+| PB4-FU02 | PB4 | Not started | Define and test a safe local HTTP development cookie flow without weakening production: production session cookies must retain `Secure` and existing protections, and an insecure development setting must not silently apply in production. Document the development boundary and test both environments. |
+| PB2-PB4-FU01 | PB2/PB4 | Not started | Schedule cleanup of expired `auth_login_throttle` rows when the relevant scheduler/infrastructure exists. Use database time and a reviewed bounded policy; test that cleanup does not reset active limits or race concurrent login attempts. |
+| P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
+
+**Next phase:** PB2 remains blocked until PB1 is complete and merged into `main`;
+this request explicitly stops before PB2.
