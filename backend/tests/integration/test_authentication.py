@@ -447,3 +447,53 @@ def test_invalid_unicode_credentials_are_generic_and_do_not_crash(
         headers=headers,
     )
     assert response.status_code == 401
+
+
+def test_account_throttle_is_shared_across_distinct_source_ips(
+    client: TestClient, account: dict[str, str | UUID]
+) -> None:
+    settings = app.state.settings
+    passwords = app.state.passwords
+    factory = app.state.session_factory
+    wrong = secrets.token_urlsafe(32)
+    results = []
+    for source in ("127.0.0.1", "127.0.0.2", "127.0.0.3"):
+        with factory() as db:
+            result = login(
+                db, settings, passwords, str(account["username"]), wrong, ip_address(source), None
+            )
+        results.append(result)
+    assert results == [AuthFailure.INVALID, AuthFailure.INVALID, AuthFailure.THROTTLED]
+
+
+def test_blocked_source_does_not_allocate_unbounded_account_buckets_or_audit_rows(
+    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+) -> None:
+    settings = app.state.settings.model_copy(update={"login_failure_limit": 1})
+    passwords = app.state.passwords
+    factory = app.state.session_factory
+    wrong = secrets.token_urlsafe(32)
+    source = ip_address("127.0.0.1")
+    with factory() as db:
+        assert (
+            login(db, settings, passwords, str(account["username"]), wrong, source, None)
+            == AuthFailure.INVALID
+        )
+    for index in range(5):
+        with factory() as db:
+            assert (
+                login(db, settings, passwords, f"unknown{index}", wrong, source, None)
+                == AuthFailure.THROTTLED
+            )
+    engine = create_engine(migrated_url, hide_parameters=True)
+    try:
+        with engine.connect() as db:
+            assert db.execute(text("SELECT count(*) FROM auth_login_throttle")).scalar_one() == 2
+            assert (
+                db.execute(
+                    text("SELECT count(*) FROM case_activities WHERE action='auth.login_throttled'")
+                ).scalar_one()
+                == 1
+            )
+    finally:
+        engine.dispose()

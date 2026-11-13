@@ -103,15 +103,16 @@ def login(
     with db.begin():
         buckets = acquire_buckets(db, settings, account, ip)
         if blocked(buckets, settings):
-            # The supplied username is untrusted and could itself contain a secret.
-            append_activity(db, username="anonymous", ip=ip, action="auth.login_throttled")
             return AuthFailure.THROTTLED
         found = _find_user(db, account) if normalized is not None else None
         user = found[0] if found is not None else None
         verified = passwords.verify(candidate, user.password_hash if user is not None else None)
         if not (valid_length and verified and user is not None and user.is_active):
             record_failure(buckets)
+            # An untrusted submitted username could itself contain a secret.
             append_activity(db, username="anonymous", ip=ip, action="auth.login_failed")
+            if blocked(buckets, settings):
+                append_activity(db, username="anonymous", ip=ip, action="auth.login_throttled")
             return AuthFailure.INVALID
         if found is None:
             return AuthFailure.INVALID
@@ -144,7 +145,6 @@ def reauthenticate(
     with db.begin():
         buckets = acquire_buckets(db, settings, identity.username, ip)
         if blocked(buckets, settings):
-            append_activity(db, username=identity.username, ip=ip, action="auth.reauth_throttled")
             return AuthFailure.THROTTLED
         found = session_rows(db, settings, token, lock=True)
         if found is None or found[0].id != identity.session_id:
@@ -154,6 +154,8 @@ def reauthenticate(
         if not (verified and valid_length):
             record_failure(buckets)
             append_activity(db, username=user.username, ip=ip, action="auth.reauth_failed")
+            if blocked(buckets, settings):
+                append_activity(db, username=user.username, ip=ip, action="auth.reauth_throttled")
             return AuthFailure.INVALID
         auth_session.reauth_at = db.execute(select(func.clock_timestamp())).scalar_one()
         append_activity(

@@ -4,6 +4,7 @@ import hmac
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request
+from pydantic import SecretStr
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +18,22 @@ from app.core.security import credential_digest
 CallNext = Callable[[Request], Awaitable[Response]]
 
 
+def csrf_matches(
+    secret: SecretStr, expected_digest: bytes, cookie: str | None, header: str | None
+) -> bool:
+    if cookie is None or header is None:
+        return False
+    try:
+        cookie_bytes = cookie.encode("utf-8")
+        header_bytes = header.encode("utf-8")
+    except UnicodeError:
+        return False
+    if not hmac.compare_digest(cookie_bytes, header_bytes):
+        return False
+    digest = credential_digest(secret, "csrf", header)
+    return hmac.compare_digest(expected_digest, digest)
+
+
 def _check_csrf(request: Request, token: str) -> int | None:
     settings: Settings = request.app.state.settings
     factory: sessionmaker[Session] = request.app.state.session_factory
@@ -26,14 +43,12 @@ def _check_csrf(request: Request, token: str) -> int | None:
             if rows is None:
                 # A stale browser cookie must not prevent a fresh public login.
                 return None if request.url.path == "/api/auth/login" else 401
-            cookie = request.cookies.get(CSRF_COOKIE)
-            header = request.headers.get(CSRF_HEADER)
-            if cookie is None or header is None:
-                return 403
-            if not hmac.compare_digest(cookie.encode("utf-8"), header.encode("utf-8")):
-                return 403
-            digest = credential_digest(settings.session_signing_secret, "csrf", header)
-            if not hmac.compare_digest(rows[0].csrf_digest, digest):
+            if not csrf_matches(
+                settings.session_signing_secret,
+                rows[0].csrf_digest,
+                request.cookies.get(CSRF_COOKIE),
+                request.headers.get(CSRF_HEADER),
+            ):
                 return 403
     except SQLAlchemyError:
         return 503
