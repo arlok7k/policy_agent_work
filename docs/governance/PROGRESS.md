@@ -21,7 +21,7 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | Task | Status | Notes |
 |---|---|---|
 | PB1-R01 | Done locally | Normal short pytest diagnostics and captured output restored; test credentials wrapped; regression retained. Full suite: 131 passed; PR CI pending. |
-| PB1-R02 | Planned | Record verifiable owner-approval evidence or mark it to be confirmed. |
+| PB1-R02 | Done | DR-002, DR-006, DR-009 and DR-013 approval is marked to be confirmed because exact owner messages are unavailable in the current context. |
 | PB1-R03 | Planned | Track the requested PB2/PB4/P1 operational follow-ups without implementing those phases. |
 
 PB1-R01's focused output regression passed (4 tests). The first audit flagged two
@@ -30,20 +30,22 @@ positives; the assertions now use named expected values. The regression and a
 repeat `make audit PYTHON=.venv/bin/python` passed, with no known vulnerabilities
 or secret findings across 112 tracked files. Pre-commit passed.
 
-**Blockers:** None currently. The spec's literal DoD-common requires all
-G-A–G-M gates in every phase, but the roadmap introduces several only in P1/P8
-and the owner restricted this request to PB1. The owner confirmed the
-[DR-002](../adr/DR-002.md) interpretation: future-scope gates remain pending,
-not passed, and mandatory in their roadmap phases. PB1's own GitHub Actions
+**Review status:** Owner approval of DR-002, DR-006, DR-009 and DR-013 is
+**to be confirmed**: the available session summary records option A selections,
+but does not preserve the exact owner messages. The spec's literal DoD-common
+requires all G-A–G-M gates in every phase, but the roadmap introduces several
+only in P1/P8 and the owner restricted this request to PB1. Under the implemented
+[DR-002](../adr/DR-002.md) interpretation, future-scope gates remain pending,
+not passed, and mandatory in their roadmap phases. PB1's earlier GitHub Actions
 workflow passed on commit `91c552b` (run 43372484803); later governance gates
-did not run. The updated branch and PR must also pass their own CI runs.
+did not run. The updated branch and PR must pass their own CI runs.
 
-**Resolved:** The owner approved public minimal database readiness in
-[DR-013](../adr/DR-013.md).
+**Implemented:** [DR-013](../adr/DR-013.md) option A exposes minimal public
+readiness; the owner-approval evidence is to be confirmed.
 
-**Resolved:** The owner approved option A in
-[DR-009](../adr/DR-009.md), covering the user/API-key wire contracts, key
-transport and administrative recovery protections. PB1-T06 passed
+**Implemented:** [DR-009](../adr/DR-009.md) option A covers the user/API-key
+wire contracts, key transport and administrative recovery protections; the
+owner-approval evidence is to be confirmed. PB1-T06 passed
 `make check PYTHON=.venv/bin/python` (62 tests, Ruff and mypy) and pre-commit.
 PB1-T07 passed the same full check with 88 tests. An initial malformed-Unicode
 security test failed in the HTTP test client's encoder before reaching the app;
@@ -88,26 +90,28 @@ environment; rerunning with `.venv/bin` on `PATH` passed all three hooks.
 
 PB1-T04 previously hit two consecutive Ruff E501 line-length failures; the owner
 authorized correcting the SQL string, and lint plus the full T04 suite passed.
-The owner approved the earlier data-model, security and public API contract in
-[DR-006](../adr/DR-006.md). PostgreSQL 18.6 runs locally in a disposable,
-Unix-socket-only test cluster. Docker is not installed and is not required by
+The implemented data-model, security and public API contract is in
+[DR-006](../adr/DR-006.md); its owner-approval evidence is to be confirmed.
+PostgreSQL 18.6 runs locally in a disposable, Unix-socket-only test cluster.
+Docker is not installed and is not required by
 PB1. The initial mypy run failed because locally built Python lacked `_sqlite3`;
 the runtime was rebuilt with SQLite support and the same check then passed. The
 downloaded test PostgreSQL package did not include `psql` or `createdb`; the
 disposable database was created through psycopg instead.
 
-**Decisions:** [DR-001](../adr/DR-001.md), [DR-002 — owner-confirmed](../adr/DR-002.md),
+**Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md),
 [DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md),
-[DR-005](../adr/DR-005.md), [DR-006 — owner-approved](../adr/DR-006.md),
+[DR-005](../adr/DR-005.md), [DR-006](../adr/DR-006.md),
 [DR-007 — authentication implementation details](../adr/DR-007.md),
-[DR-008 — legacy role dependency](../adr/DR-008.md). DR-007 and DR-008 implement
-the owner-approved DR-006 contract and have not received separate owner approval.
-[DR-009 — user/API-key details](../adr/DR-009.md) is owner-approved;
-[DR-010 — redacted test output](../adr/DR-010.md) and
-[DR-011 — key representation](../adr/DR-011.md), and
-[DR-012 — errors and logging](../adr/DR-012.md) are implementation decisions.
-[DR-013 — public health access](../adr/DR-013.md) is owner-approved;
-[DR-014 — development seed](../adr/DR-014.md) is an implementation decision.
+[DR-008 — legacy role dependency](../adr/DR-008.md),
+[DR-009 — user/API-key details](../adr/DR-009.md),
+[DR-010 — test credential redaction](../adr/DR-010.md),
+[DR-011 — key representation](../adr/DR-011.md),
+[DR-012 — errors and logging](../adr/DR-012.md),
+[DR-013 — public health access](../adr/DR-013.md), and
+[DR-014 — development seed](../adr/DR-014.md). Owner approval for DR-002,
+DR-006, DR-009 and DR-013 is to be confirmed; DR-007, DR-008, DR-010, DR-011,
+DR-012 and DR-014 are implementation decisions.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks are implemented. The prior push run
@@ -121,8 +125,9 @@ not claimed as passing here (see DR-002). PB4 frontend/Compose checks are pendin
 
 **Open risks:** Expired login-throttle buckets have no cleanup job yet; source-IP
 quotas require a trusted proxy boundary and upstream volumetric controls. Legal
-review of the LGPL-3.0-only psycopg packages is still needed. The approved public
-health endpoint reveals database readiness to callers who can reach it.
+review of the LGPL-3.0-only psycopg packages is still needed. The implemented
+public health endpoint reveals database readiness to callers who can reach it;
+its approval evidence is to be confirmed.
 
 **CI evidence limitation:** GitHub reported the push workflow's successful
 conclusion, but the sandbox could not fetch its log archive from GitHub's log
