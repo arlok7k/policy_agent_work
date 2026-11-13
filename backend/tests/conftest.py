@@ -12,14 +12,6 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
 
-def pytest_terminal_summary(terminalreporter: object) -> None:
-    """Report failing test names without exposing fixture values or tracebacks."""
-    failures = terminalreporter.stats.get("failed", [])  # type: ignore[attr-defined]
-    for report in failures:
-        name = report.nodeid.split("[", 1)[0]
-        terminalreporter.write_line(f"FAILED {name} ({report.when})")  # type: ignore[attr-defined]
-
-
 @pytest.fixture
 def disposable_database_url() -> Iterator[str]:
     raw_url = os.environ.get("TEST_DATABASE_URL")

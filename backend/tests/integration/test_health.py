@@ -1,6 +1,5 @@
 """Public health is minimal and probes a real PostgreSQL connection."""
 
-import secrets
 from collections.abc import Iterator
 from uuid import UUID
 
@@ -11,6 +10,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.main import app
+from tests.sensitive import Redacted, assert_not_disclosed, reveal
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def client(runtime_url: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     values = {
         "ENV": "test",
         "DATABASE_URL": runtime_url,
-        "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "SESSION_SIGNING_SECRET": Redacted.random(48),
         "SESSION_TTL_SECONDS": "3600",
         "LOGIN_FAILURE_LIMIT": "5",
         "LOGIN_WINDOW_SECONDS": "60",
@@ -33,7 +33,7 @@ def client(runtime_url: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     for key, value in values.items():
-        monkeypatch.setenv(key, value)
+        monkeypatch.setenv(key, reveal(value))
     with TestClient(app, base_url="https://testserver") as test_client:
         yield test_client
 
@@ -59,6 +59,7 @@ def test_unreachable_database_returns_generic_503(
         assert response.headers["content-type"].startswith("application/problem+json")
         assert response.json()["code"] == "GOV-HTTP-503"
         assert set(response.json()) == {"type", "title", "status", "code", "correlation_id"}
-        assert runtime_url not in response.text and "127.0.0.1" not in response.text
+        assert_not_disclosed("Readiness response", response.text, Redacted(runtime_url))
+        assert "127.0.0.1" not in response.text
     finally:
         dead_engine.dispose()

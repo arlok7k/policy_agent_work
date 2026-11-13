@@ -2,7 +2,6 @@
 
 import hmac
 import json
-import secrets
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from ipaddress import ip_address
@@ -19,12 +18,13 @@ from app.auth.service import AuthFailure, LoginSuccess, login
 from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 from app.auth.step_up import PasswordStepUpProvider
 from app.main import app
+from tests.sensitive import Redacted, SecretAwareTestClient, assert_not_disclosed, reveal
 
 
 @pytest.fixture
-def account(migrated_url: str) -> dict[str, str | UUID]:
-    password = secrets.token_urlsafe(32)
-    digest = PasswordHasher(type=Type.ID).hash(password)
+def account(migrated_url: str) -> dict[str, str | UUID | Redacted]:
+    password = Redacted.random()
+    digest = Redacted(PasswordHasher(type=Type.ID).hash(password.reveal()))
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.begin() as db:
@@ -34,7 +34,7 @@ def account(migrated_url: str) -> dict[str, str | UUID]:
                     "VALUES (:username, :digest, (SELECT id FROM roles WHERE name='analyst')) "
                     "RETURNING id"
                 ),
-                {"username": "alice", "digest": digest},
+                {"username": "alice", "digest": digest.reveal()},
             ).scalar_one()
         return {"username": "alice", "password": password, "digest": digest, "id": user_id}
     finally:
@@ -43,12 +43,12 @@ def account(migrated_url: str) -> dict[str, str | UUID]:
 
 @pytest.fixture
 def client(
-    runtime_url: str, account: dict[str, str | UUID], monkeypatch: pytest.MonkeyPatch
+    runtime_url: str, account: dict[str, str | UUID | Redacted], monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[TestClient]:
     values = {
         "ENV": "test",
         "DATABASE_URL": runtime_url,
-        "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "SESSION_SIGNING_SECRET": Redacted.random(48),
         "SESSION_TTL_SECONDS": "3600",
         "LOGIN_FAILURE_LIMIT": "2",
         "LOGIN_WINDOW_SECONDS": "60",
@@ -63,21 +63,25 @@ def client(
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     for key, value in values.items():
-        monkeypatch.setenv(key, value)
-    with TestClient(app, base_url="https://testserver", client=("127.0.0.1", 50123)) as test_client:
+        monkeypatch.setenv(key, reveal(value))
+    with SecretAwareTestClient(
+        app, base_url="https://testserver", client=("127.0.0.1", 50123)
+    ) as test_client:
         yield test_client
 
 
-def login_as(client: TestClient, account: dict[str, str | UUID]) -> tuple[str, str]:
+def login_as(
+    client: TestClient, account: dict[str, str | UUID | Redacted]
+) -> tuple[Redacted, Redacted]:
     response = client.post(
         "/api/auth/login", json={"username": account["username"], "password": account["password"]}
     )
     assert response.status_code == 200
-    return response.cookies[SESSION_COOKIE], response.cookies[CSRF_COOKIE]
+    return Redacted(response.cookies[SESSION_COOKIE]), Redacted(response.cookies[CSRF_COOKIE])
 
 
 def test_login_reauth_logout_and_cookie_flags(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str
 ) -> None:
     response = client.post(
         "/api/auth/login", json={"username": " ALICE ", "password": account["password"]}
@@ -97,9 +101,9 @@ def test_login_reauth_logout_and_cookie_flags(
     assert not csrf_is_httponly
     assert not has_domain
     assert response.json()["principal"]["roles"] == ["analyst"]
-    assert all(str(account[key]) not in response.text for key in ("password", "digest"))
+    assert_not_disclosed("Login response", response.text, account["password"], account["digest"])
     assert client.get("/api/auth/me").status_code == 200
-    csrf = response.cookies[CSRF_COOKIE]
+    csrf = Redacted(response.cookies[CSRF_COOKIE])
     assert (
         client.post("/api/auth/reauth", json={"password": account["password"]}).status_code == 403
     )
@@ -133,14 +137,14 @@ def test_login_reauth_logout_and_cookie_flags(
                     for row in db.execute(text("SELECT action, details FROM case_activities"))
                 ]
             )
-            assert all(str(account[key]) not in audit for key in ("password", "digest"))
+            assert_not_disclosed("Login audit", audit, account["password"], account["digest"])
     finally:
         engine.dispose()
 
 
 @pytest.mark.parametrize("path", ["/api/auth/logout", "/api/auth/reauth", "/api/auth/login"])
 def test_every_cookie_mutation_requires_csrf(
-    client: TestClient, account: dict[str, str | UUID], path: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], path: str
 ) -> None:
     login_as(client, account)
     response = client.post(
@@ -151,14 +155,16 @@ def test_every_cookie_mutation_requires_csrf(
 
 
 def test_forged_double_submit_is_bound_to_session(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
     session, _ = login_as(client, account)
-    forged = secrets.token_urlsafe(32)
+    forged = Redacted.random()
     response = client.post(
         "/api/auth/logout",
         headers={
-            "Cookie": f"{SESSION_COOKIE}={session}; {CSRF_COOKIE}={forged}",
+            "Cookie": Redacted(
+                f"{SESSION_COOKIE}={session.reveal()}; {CSRF_COOKIE}={forged.reveal()}"
+            ),
             CSRF_HEADER: forged,
         },
     )
@@ -166,16 +172,19 @@ def test_forged_double_submit_is_bound_to_session(
     assert client.get("/api/auth/me").status_code == 200
 
 
-def test_session_fixation_and_rotation(client: TestClient, account: dict[str, str | UUID]) -> None:
-    attacker_token = secrets.token_urlsafe(32)
+def test_session_fixation_and_rotation(
+    client: TestClient, account: dict[str, str | UUID | Redacted]
+) -> None:
+    attacker_token = Redacted.random()
     first = client.post(
         "/api/auth/login",
         json={"username": account["username"], "password": account["password"]},
-        headers={"Cookie": f"{SESSION_COOKIE}={attacker_token}"},
+        headers={"Cookie": Redacted(f"{SESSION_COOKIE}={attacker_token.reveal()}")},
     )
     assert first.status_code == 200
-    old_session, csrf = first.cookies[SESSION_COOKIE], first.cookies[CSRF_COOKIE]
-    session_reused = hmac.compare_digest(old_session, attacker_token)
+    old_session = Redacted(first.cookies[SESSION_COOKIE])
+    csrf = Redacted(first.cookies[CSRF_COOKIE])
+    session_reused = hmac.compare_digest(old_session.reveal(), attacker_token.reveal())
     assert not session_reused
     second = client.post(
         "/api/auth/login",
@@ -183,20 +192,16 @@ def test_session_fixation_and_rotation(client: TestClient, account: dict[str, st
         headers={CSRF_HEADER: csrf},
     )
     assert second.status_code == 200
-    session_reused = hmac.compare_digest(old_session, second.cookies[SESSION_COOKIE])
+    session_reused = hmac.compare_digest(old_session.reveal(), second.cookies[SESSION_COOKIE])
     assert not session_reused
-    assert (
-        client.get(
-            "/api/auth/me", headers={"Cookie": f"{SESSION_COOKIE}={old_session}"}
-        ).status_code
-        == 401
-    )
+    old_cookie = {"Cookie": Redacted(f"{SESSION_COOKIE}={old_session.reveal()}")}
+    assert client.get("/api/auth/me", headers=old_cookie).status_code == 401
     assert client.get("/api/auth/me").status_code == 200
 
 
 @pytest.mark.parametrize("mutation", ["revoke", "expire", "disable"])
 def test_sessions_reject_revoked_expired_or_disabled_users_immediately(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str, mutation: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str, mutation: str
 ) -> None:
     login_as(client, account)
     sql = {
@@ -215,9 +220,9 @@ def test_sessions_reject_revoked_expired_or_disabled_users_immediately(
 
 
 def test_wrong_and_unknown_credentials_are_generic_and_rate_limited(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
-    wrong = secrets.token_urlsafe(32)
+    wrong = Redacted.random()
     headers = {"X-Correlation-Id": str(uuid4())}
     first = client.post(
         "/api/auth/login",
@@ -233,16 +238,17 @@ def test_wrong_and_unknown_credentials_are_generic_and_rate_limited(
         client.post("/api/auth/login", json={"username": "another", "password": wrong}).status_code
         == 429
     )
-    assert all(wrong not in response.text for response in (first, second))
+    for response in (first, second):
+        assert_not_disclosed("Login failure response", response.text, wrong)
 
 
 def test_concurrent_failures_share_atomic_database_limit(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
     settings = app.state.settings.model_copy(update={"login_failure_limit": 1})
     factory = app.state.session_factory
     passwords = app.state.passwords
-    wrong = secrets.token_urlsafe(32)
+    wrong = Redacted.random()
 
     def attempt() -> AuthFailure:
         with factory() as db:
@@ -251,7 +257,7 @@ def test_concurrent_failures_share_atomic_database_limit(
                 settings,
                 passwords,
                 str(account["username"]),
-                wrong,
+                wrong.reveal(),
                 ip_address("127.0.0.1"),
                 None,
             )
@@ -264,9 +270,9 @@ def test_concurrent_failures_share_atomic_database_limit(
 
 
 def test_validation_and_mixed_credentials_do_not_leak(
-    client: TestClient, account: dict[str, str | UUID], caplog: pytest.LogCaptureFixture
+    client: TestClient, account: dict[str, str | UUID | Redacted], caplog: pytest.LogCaptureFixture
 ) -> None:
-    extra = secrets.token_urlsafe(40)
+    extra = Redacted.random(40)
     bad = client.post(
         "/api/auth/login",
         json={
@@ -276,7 +282,9 @@ def test_validation_and_mixed_credentials_do_not_leak(
         },
     )
     assert bad.status_code == 400
-    assert all(secret not in bad.text + caplog.text for secret in (extra, str(account["password"])))
+    assert_not_disclosed(
+        "Validation response or log", bad.text + caplog.text, extra, account["password"]
+    )
     login_as(client, account)
     assert (
         client.get("/api/auth/me", headers={"Authorization": "Bearer invalid"}).status_code == 401
@@ -284,7 +292,7 @@ def test_validation_and_mixed_credentials_do_not_leak(
 
 
 def test_only_digests_are_persisted_for_session_cookies(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str
 ) -> None:
     session_token, csrf_token = login_as(client, account)
     engine = create_engine(migrated_url, hide_parameters=True)
@@ -292,7 +300,8 @@ def test_only_digests_are_persisted_for_session_cookies(
         with engine.connect() as db:
             row = db.execute(text("SELECT token_digest, csrf_digest FROM auth_sessions")).one()
         no_plaintext = (
-            row.token_digest != session_token.encode() and row.csrf_digest != csrf_token.encode()
+            row.token_digest != session_token.reveal().encode()
+            and row.csrf_digest != csrf_token.reveal().encode()
         )
         assert no_plaintext
     finally:
@@ -300,10 +309,10 @@ def test_only_digests_are_persisted_for_session_cookies(
 
 
 def test_reauthentication_failures_share_the_login_rate_limit(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
     _, csrf = login_as(client, account)
-    wrong = secrets.token_urlsafe(32)
+    wrong = Redacted.random()
     for _ in range(2):
         result = client.post(
             "/api/auth/reauth", json={"password": wrong}, headers={CSRF_HEADER: csrf}
@@ -315,7 +324,7 @@ def test_reauthentication_failures_share_the_login_rate_limit(
 
 
 def test_concurrent_successful_logins_create_independent_sessions(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
     settings = app.state.settings
     factory = app.state.session_factory
@@ -328,7 +337,7 @@ def test_concurrent_successful_logins_create_independent_sessions(
                 settings,
                 passwords,
                 str(account["username"]),
-                str(account["password"]),
+                account["password"].reveal(),
                 ip_address("127.0.0.1"),
                 None,
             )
@@ -344,8 +353,8 @@ def test_concurrent_successful_logins_create_independent_sessions(
 def test_untrusted_username_and_password_are_not_written_to_activity(
     client: TestClient, migrated_url: str
 ) -> None:
-    username = secrets.token_urlsafe(32)
-    password = secrets.token_urlsafe(32)
+    username = Redacted.random()
+    password = Redacted.random()
     response = client.post("/api/auth/login", json={"username": username, "password": password})
     assert response.status_code == 401
     engine = create_engine(migrated_url, hide_parameters=True)
@@ -356,14 +365,13 @@ def test_untrusted_username_and_password_are_not_written_to_activity(
                     text("SELECT username, ip, action, target, details FROM case_activities")
                 ).all()
             )
-        assert username not in activities
-        assert password not in activities
+        assert_not_disclosed("Failed-login activity", activities, username, password)
     finally:
         engine.dispose()
 
 
 def test_audit_failure_rolls_back_successful_login(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str
 ) -> None:
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
@@ -374,7 +382,7 @@ def test_audit_failure_rolls_back_successful_login(
             json={"username": account["username"], "password": account["password"]},
         )
         assert response.status_code == 503
-        assert str(account["password"]) not in response.text
+        assert_not_disclosed("Audit failure response", response.text, account["password"])
         with engine.connect() as db:
             assert db.execute(text("SELECT count(*) FROM auth_sessions")).scalar_one() == 0
     finally:
@@ -384,9 +392,9 @@ def test_audit_failure_rolls_back_successful_login(
 
 
 def test_login_throttle_window_expires_using_database_time(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str
 ) -> None:
-    wrong = secrets.token_urlsafe(32)
+    wrong = Redacted.random()
     credentials = {"username": account["username"], "password": wrong}
     assert client.post("/api/auth/login", json=credentials).status_code == 401
     assert client.post("/api/auth/login", json=credentials).status_code == 401
@@ -412,7 +420,7 @@ def test_login_throttle_window_expires_using_database_time(
 
 
 def test_current_user_reads_current_role_from_database_each_request(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str
 ) -> None:
     login_as(client, account)
     assert client.get("/api/auth/me").json()["principal"]["roles"] == ["analyst"]
@@ -432,7 +440,7 @@ def test_current_user_reads_current_role_from_database_each_request(
 
 
 def test_invalid_unicode_credentials_are_generic_and_do_not_crash(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
     headers = {"Content-Type": "application/json"}
     response = client.post(
@@ -443,48 +451,52 @@ def test_invalid_unicode_credentials_are_generic_and_do_not_crash(
     assert response.status_code == 401
     response = client.post(
         "/api/auth/login",
-        content=json.dumps({"username": "\ud800", "password": account["password"]}),
+        content=json.dumps(reveal({"username": "\ud800", "password": account["password"]})),
         headers=headers,
     )
     assert response.status_code == 401
 
 
 def test_account_throttle_is_shared_across_distinct_source_ips(
-    client: TestClient, account: dict[str, str | UUID]
+    client: TestClient, account: dict[str, str | UUID | Redacted]
 ) -> None:
     settings = app.state.settings
     passwords = app.state.passwords
     factory = app.state.session_factory
-    wrong = secrets.token_urlsafe(32)
+    wrong = Redacted.random()
     results = []
     for source in ("127.0.0.1", "127.0.0.2", "127.0.0.3"):
         with factory() as db:
             result = login(
-                db, settings, passwords, str(account["username"]), wrong, ip_address(source), None
+                db,
+                settings,
+                passwords,
+                str(account["username"]),
+                wrong.reveal(),
+                ip_address(source),
+                None,
             )
         results.append(result)
     assert results == [AuthFailure.INVALID, AuthFailure.INVALID, AuthFailure.THROTTLED]
 
 
 def test_blocked_source_does_not_allocate_unbounded_account_buckets_or_audit_rows(
-    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+    client: TestClient, account: dict[str, str | UUID | Redacted], migrated_url: str
 ) -> None:
     settings = app.state.settings.model_copy(update={"login_failure_limit": 1})
     passwords = app.state.passwords
     factory = app.state.session_factory
-    wrong = secrets.token_urlsafe(32)
+    wrong = Redacted.random()
     source = ip_address("127.0.0.1")
     with factory() as db:
-        assert (
-            login(db, settings, passwords, str(account["username"]), wrong, source, None)
-            == AuthFailure.INVALID
+        result = login(
+            db, settings, passwords, str(account["username"]), wrong.reveal(), source, None
         )
+        assert result == AuthFailure.INVALID
     for index in range(5):
         with factory() as db:
-            assert (
-                login(db, settings, passwords, f"unknown{index}", wrong, source, None)
-                == AuthFailure.THROTTLED
-            )
+            result = login(db, settings, passwords, f"unknown{index}", wrong.reveal(), source, None)
+            assert result == AuthFailure.THROTTLED
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.connect() as db:

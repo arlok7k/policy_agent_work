@@ -23,6 +23,7 @@ from app.auth.session import (
 from app.main import app
 from app.users.schemas import UserPatch
 from app.users.service import update_user
+from tests.sensitive import Redacted, SecretAwareTestClient, assert_not_disclosed, reveal
 
 
 @pytest.fixture
@@ -38,15 +39,15 @@ def accounts(migrated_url: str) -> dict[str, dict[str, object]]:
                 ("sam", "senior_analyst"),
                 ("amy", "analyst"),
             ):
-                password = secrets.token_urlsafe(32)
-                digest = hasher.hash(password)
+                password = Redacted.random()
+                digest = Redacted(hasher.hash(password.reveal()))
                 identifier = db.execute(
                     text(
                         "INSERT INTO users (username, password_hash, role_id) "
                         "VALUES (:name, :digest, (SELECT id FROM roles WHERE name=:role)) "
                         "RETURNING id"
                     ),
-                    {"name": name, "digest": digest, "role": role},
+                    {"name": name, "digest": digest.reveal(), "role": role},
                 ).scalar_one()
                 result[name] = {
                     "id": identifier,
@@ -66,7 +67,7 @@ def client(
     values = {
         "ENV": "test",
         "DATABASE_URL": runtime_url,
-        "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "SESSION_SIGNING_SECRET": Redacted.random(48),
         "SESSION_TTL_SECONDS": "3600",
         "LOGIN_FAILURE_LIMIT": "20",
         "LOGIN_WINDOW_SECONDS": "60",
@@ -81,21 +82,25 @@ def client(
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     for key, value in values.items():
-        monkeypatch.setenv(key, value)
-    with TestClient(app, base_url="https://testserver", client=("127.0.0.1", 50123)) as test_client:
+        monkeypatch.setenv(key, reveal(value))
+    with SecretAwareTestClient(
+        app, base_url="https://testserver", client=("127.0.0.1", 50123)
+    ) as test_client:
         yield test_client
 
 
-def login_as(client: TestClient, account: dict[str, object]) -> dict[str, str]:
+def login_as(client: TestClient, account: dict[str, object]) -> dict[str, str | Redacted]:
     client.cookies.clear()
     response = client.post(
         "/api/auth/login", json={"username": account["username"], "password": account["password"]}
     )
     assert response.status_code == 200
     return {
-        "Cookie": f"{SESSION_COOKIE}={response.cookies[SESSION_COOKIE]}; "
-        f"{CSRF_COOKIE}={response.cookies[CSRF_COOKIE]}",
-        CSRF_HEADER: response.cookies[CSRF_COOKIE],
+        "Cookie": Redacted(
+            f"{SESSION_COOKIE}={response.cookies[SESSION_COOKIE]}; "
+            f"{CSRF_COOKIE}={response.cookies[CSRF_COOKIE]}"
+        ),
+        CSRF_HEADER: Redacted(response.cookies[CSRF_COOKIE]),
     }
 
 
@@ -103,7 +108,7 @@ def test_admin_create_list_update_and_safe_metadata(
     client: TestClient, accounts: dict[str, dict[str, object]], migrated_url: str
 ) -> None:
     auth = login_as(client, accounts["alice"])
-    password = secrets.token_urlsafe(32)
+    password = Redacted.random()
     response = client.post(
         "/api/users",
         headers=auth,
@@ -113,7 +118,7 @@ def test_admin_create_list_update_and_safe_metadata(
     user = response.json()
     assert set(user) == {"id", "username", "role", "is_active", "created_at", "updated_at"}
     assert user["username"] == "new.user" and user["is_active"] is True
-    assert password not in response.text
+    assert_not_disclosed("User response", response.text, password)
     first = client.get("/api/users", headers=auth).json()
     second = client.get("/api/users?limit=2&offset=2", headers=auth).json()
     assert first["limit"] == 2 and first["offset"] == 0 and len(first["items"]) == 2
@@ -125,17 +130,21 @@ def test_admin_create_list_update_and_safe_metadata(
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.connect() as db:
-            digest = db.execute(
-                text("SELECT password_hash FROM users WHERE username='new.user'")
-            ).scalar_one()
-            assert digest.startswith("$argon2id$")
-            assert PasswordHasher().verify(digest, password)
+            digest = Redacted(
+                db.execute(
+                    text("SELECT password_hash FROM users WHERE username='new.user'")
+                ).scalar_one()
+            )
+            is_argon2id = digest.reveal().startswith("$argon2id$")
+            assert is_argon2id
+            verified = PasswordHasher().verify(digest.reveal(), password.reveal())
+            assert verified
             audit = str(
                 db.execute(
                     text("SELECT username, action, target, details FROM case_activities")
                 ).all()
             )
-            assert password not in audit and digest not in audit
+            assert_not_disclosed("User activity", audit, password, digest)
     finally:
         engine.dispose()
 
@@ -146,7 +155,7 @@ def test_non_admin_cannot_bypass_users_roles(
 ) -> None:
     auth = login_as(client, accounts[name])
     auth["X-Role"] = "admin"
-    password = secrets.token_urlsafe(32)
+    password = Redacted.random()
     assert client.get("/api/users", headers=auth).status_code == 403
     assert (
         client.post(
@@ -169,8 +178,8 @@ def test_admin_mutations_require_session_bound_csrf(
 ) -> None:
     auth = login_as(client, accounts["alice"])
     no_csrf = {"Cookie": auth["Cookie"]}
-    forged = {**auth, CSRF_HEADER: secrets.token_urlsafe(32)}
-    payload = {"username": "new", "password": secrets.token_urlsafe(32), "role": "analyst"}
+    forged = {**auth, CSRF_HEADER: Redacted.random()}
+    payload = {"username": "new", "password": Redacted.random(), "role": "analyst"}
     assert client.post("/api/users", headers=no_csrf, json=payload).status_code == 403
     assert client.post("/api/users", headers=forged, json=payload).status_code == 403
     assert (
@@ -187,7 +196,7 @@ def test_validation_conflict_and_self_lockout_protection(
     client: TestClient, accounts: dict[str, dict[str, object]]
 ) -> None:
     auth = login_as(client, accounts["alice"])
-    password = secrets.token_urlsafe(32)
+    password = Redacted.random()
     for bad_name in ("bad/name", "Kelvin", "a" * 129, ""):
         response = client.post(
             "/api/users",
@@ -195,12 +204,13 @@ def test_validation_conflict_and_self_lockout_protection(
             json={"username": bad_name, "password": password, "role": "analyst"},
         )
         assert response.status_code == 422
-        assert password not in response.text
+        assert_not_disclosed("User validation response", response.text, password)
+    short_password = Redacted(password.reveal()[:3])
     assert (
         client.post(
             "/api/users",
             headers=auth,
-            json={"username": "new", "password": password[:3], "role": "analyst"},
+            json={"username": "new", "password": short_password, "role": "analyst"},
         ).status_code
         == 422
     )
@@ -254,13 +264,14 @@ def test_password_change_revokes_all_old_sessions(
     first = login_as(client, accounts["amy"])
     second = login_as(client, accounts["amy"])
     admin = login_as(client, accounts["alice"])
-    new_password = secrets.token_urlsafe(32)
+    new_password = Redacted.random()
     changed = client.patch(
         "/api/users",
         headers=admin,
         json={"id": str(accounts["amy"]["id"]), "password": new_password},
     )
-    assert changed.status_code == 200 and new_password not in changed.text
+    assert changed.status_code == 200
+    assert_not_disclosed("Password change response", changed.text, new_password)
     assert client.get("/api/auth/me", headers=first).status_code == 401
     assert client.get("/api/auth/me", headers=second).status_code == 401
     client.cookies.clear()
@@ -328,7 +339,7 @@ def test_user_write_rolls_back_when_audit_fails(
             headers=admin,
             json={
                 "username": "notpersisted",
-                "password": secrets.token_urlsafe(32),
+                "password": Redacted.random(),
                 "role": "analyst",
             },
         )
@@ -377,7 +388,7 @@ def test_admin_identity_is_rechecked_after_dependency_before_mutation(
                 headers=admin,
                 json={
                     "username": "afterchange",
-                    "password": secrets.token_urlsafe(32),
+                    "password": Redacted.random(),
                     "role": "analyst",
                 },
             )
@@ -416,13 +427,13 @@ def test_concurrent_admin_disables_cannot_remove_last_admin(
     passwords = app.state.passwords
     factory = app.state.session_factory
     tokens = [
-        first["Cookie"].split(";")[0].split("=", 1)[1],
-        second["Cookie"].split(";")[0].split("=", 1)[1],
+        Redacted(first["Cookie"].reveal().split(";")[0].split("=", 1)[1]),
+        Redacted(second["Cookie"].reveal().split(";")[0].split("=", 1)[1]),
     ]
     identities = []
     for token in tokens:
         with factory() as db:
-            rows = session_rows(db, settings, token)
+            rows = session_rows(db, settings, token.reveal())
             assert rows is not None
             identities.append(identity_from_rows(rows))
     barrier = threading.Barrier(2)
@@ -436,7 +447,7 @@ def test_concurrent_admin_disables_cannot_remove_last_admin(
                     settings,
                     passwords,
                     identities[index],
-                    tokens[index],
+                    tokens[index].reveal(),
                     ("admin",),
                     UserPatch(id=identities[1 - index].user_id, is_active=False),
                     ip_address("127.0.0.1"),
@@ -486,7 +497,7 @@ def test_admin_can_change_own_password_but_session_is_revoked(
     client: TestClient, accounts: dict[str, dict[str, object]]
 ) -> None:
     admin = login_as(client, accounts["alice"])
-    password = secrets.token_urlsafe(32)
+    password = Redacted.random()
     response = client.patch(
         "/api/users", headers=admin, json={"id": str(accounts["alice"]["id"]), "password": password}
     )
@@ -509,7 +520,7 @@ def test_unauthenticated_user_routes_and_extra_fields_fail_closed(
         headers=admin,
         json={
             "username": "new",
-            "password": secrets.token_urlsafe(32),
+            "password": Redacted.random(),
             "role": "analyst",
             "is_active": True,
         },

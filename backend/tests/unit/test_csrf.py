@@ -6,16 +6,21 @@ from pydantic import SecretStr
 
 from app.auth.csrf import csrf_matches
 from app.core.security import credential_digest
+from tests.sensitive import Redacted, reveal
 
 
 def test_csrf_requires_matching_cookie_header_and_stored_digest() -> None:
     key = SecretStr(secrets.token_urlsafe(48))
-    legitimate = secrets.token_urlsafe(32)
-    forged = secrets.token_urlsafe(32)
-    stored = credential_digest(key, "csrf", legitimate)
-    assert csrf_matches(key, stored, legitimate, legitimate)
-    assert not csrf_matches(key, stored, None, legitimate)
-    assert not csrf_matches(key, stored, legitimate, None)
-    assert not csrf_matches(key, stored, legitimate, forged)
-    assert not csrf_matches(key, stored, forged, forged)
-    assert not csrf_matches(key, stored, "\ud800", "\ud800")
+    legitimate = Redacted.random()
+    forged = Redacted.random()
+    stored = credential_digest(key, "csrf", legitimate.reveal())
+
+    def matches(cookie: Redacted | str | None, header: Redacted | str | None) -> bool:
+        return csrf_matches(key, stored, reveal(cookie), reveal(header))
+
+    assert matches(legitimate, legitimate)
+    assert not matches(None, legitimate)
+    assert not matches(legitimate, None)
+    assert not matches(legitimate, forged)
+    assert not matches(forged, forged)
+    assert not matches("\ud800", "\ud800")

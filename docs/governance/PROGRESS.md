@@ -16,6 +16,20 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T10 | Done | Public database readiness with real healthy/unreachable checks; 116 tests passed |
 | PB1-T11 | Done | Atomic development-only seed and safe run instructions; 128 tests passed |
 
+## PB1 review follow-ups
+
+| Task | Status | Notes |
+|---|---|---|
+| PB1-R01 | Done locally | Normal short pytest diagnostics and captured output restored; test credentials wrapped; regression retained. Full suite: 131 passed; PR CI pending. |
+| PB1-R02 | Planned | Record verifiable owner-approval evidence or mark it to be confirmed. |
+| PB1-R03 | Planned | Track the requested PB2/PB4/P1 operational follow-ups without implementing those phases. |
+
+PB1-R01's focused output regression passed (4 tests). The first audit flagged two
+nonsecret expected-value literals in its failure probes as secret-keyword false
+positives; the assertions now use named expected values. The regression and a
+repeat `make audit PYTHON=.venv/bin/python` passed, with no known vulnerabilities
+or secret findings across 112 tracked files. Pre-commit passed.
+
 **Blockers:** None currently. The spec's literal DoD-common requires all
 G-A–G-M gates in every phase, but the roadmap introduces several only in P1/P8
 and the owner restricted this request to PB1. The owner confirmed the
@@ -34,8 +48,10 @@ transport and administrative recovery protections. PB1-T06 passed
 PB1-T07 passed the same full check with 88 tests. An initial malformed-Unicode
 security test failed in the HTTP test client's encoder before reaching the app;
 the fixture's throwaway password/hash appeared in the default failure output.
-The test was corrected and passed, and [DR-010](../adr/DR-010.md) records the
-redacted failure-output policy and its regression test. The T07 audit reported
+The test was corrected and passed. Following PB1 review,
+[DR-010](../adr/DR-010.md) supersedes the earlier suppressed-output policy with
+normal short tracebacks, captured output and source-level test-value redaction.
+The T07 audit reported
 no known vulnerabilities or secret findings across 82 tracked files; all
 pre-commit hooks passed. PB1-T08 passed `make check PYTHON=.venv/bin/python`
 (100 tests, Ruff and mypy), including owned-key IDOR, revocation, service-role

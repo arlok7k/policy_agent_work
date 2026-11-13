@@ -41,8 +41,7 @@ where = ["backend"]
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]
-# Avoid printing generated test credentials or hashes in failure tracebacks.
-addopts = "-rN --strict-markers --tb=no --show-capture=no"
+addopts = "--strict-markers --tb=short"
 
 [tool.ruff]
 target-version = "py315"

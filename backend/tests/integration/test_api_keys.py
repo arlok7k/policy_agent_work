@@ -1,6 +1,5 @@
 """API-key ownership, service identity and revocation on disposable PostgreSQL."""
 
-import secrets
 import threading
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -14,6 +13,7 @@ from sqlalchemy import create_engine, text
 from app.auth.key_schemas import KeyIssued
 from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 from app.main import app
+from tests.sensitive import Redacted, SecretAwareTestClient, assert_not_disclosed, reveal
 
 
 @pytest.fixture
@@ -29,15 +29,15 @@ def accounts(migrated_url: str) -> dict[str, dict[str, object]]:
                 ("amy", "analyst"),
                 ("sam", "senior_analyst"),
             ):
-                password = secrets.token_urlsafe(32)
-                digest = hasher.hash(password)
+                password = Redacted.random()
+                digest = Redacted(hasher.hash(password.reveal()))
                 identifier = db.execute(
                     text(
                         "INSERT INTO users (username, password_hash, role_id) "
                         "VALUES (:name, :digest, (SELECT id FROM roles WHERE name=:role)) "
                         "RETURNING id"
                     ),
-                    {"name": name, "digest": digest, "role": role},
+                    {"name": name, "digest": digest.reveal(), "role": role},
                 ).scalar_one()
                 result[name] = {"id": identifier, "username": name, "password": password}
         return result
@@ -52,7 +52,7 @@ def client(
     values = {
         "ENV": "test",
         "DATABASE_URL": runtime_url,
-        "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "SESSION_SIGNING_SECRET": Redacted.random(48),
         "SESSION_TTL_SECONDS": "3600",
         "LOGIN_FAILURE_LIMIT": "20",
         "LOGIN_WINDOW_SECONDS": "60",
@@ -67,35 +67,43 @@ def client(
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     for key, value in values.items():
-        monkeypatch.setenv(key, value)
-    with TestClient(app, base_url="https://testserver", client=("127.0.0.1", 50123)) as test_client:
+        monkeypatch.setenv(key, reveal(value))
+    with SecretAwareTestClient(
+        app, base_url="https://testserver", client=("127.0.0.1", 50123)
+    ) as test_client:
         yield test_client
 
 
-def login_as(client: TestClient, account: dict[str, object]) -> dict[str, str]:
+def login_as(client: TestClient, account: dict[str, object]) -> dict[str, Redacted]:
     client.cookies.clear()
     response = client.post(
         "/api/auth/login", json={"username": account["username"], "password": account["password"]}
     )
     assert response.status_code == 200
     headers = {
-        "Cookie": f"{SESSION_COOKIE}={response.cookies[SESSION_COOKIE]}; "
-        f"{CSRF_COOKIE}={response.cookies[CSRF_COOKIE]}",
-        CSRF_HEADER: response.cookies[CSRF_COOKIE],
+        "Cookie": Redacted(
+            f"{SESSION_COOKIE}={response.cookies[SESSION_COOKIE]}; "
+            f"{CSRF_COOKIE}={response.cookies[CSRF_COOKIE]}"
+        ),
+        CSRF_HEADER: Redacted(response.cookies[CSRF_COOKIE]),
     }
     client.cookies.clear()
     return headers
 
 
-def issue(client: TestClient, admin: dict[str, str], name: str = "automation") -> dict[str, object]:
+def issue(
+    client: TestClient, admin: dict[str, Redacted], name: str = "automation"
+) -> dict[str, object]:
     response = client.post("/api/api-keys", headers=admin, json={"name": name, "ttl_seconds": 600})
     assert response.status_code == 201
     assert response.headers["cache-control"] == "no-store"
-    return response.json()
+    result = response.json()
+    result["secret"] = Redacted(result["secret"])
+    return result
 
 
-def bearer(secret: object) -> dict[str, str]:
-    return {"Authorization": f"Bearer {secret}"}
+def bearer(secret: Redacted) -> dict[str, Redacted]:
+    return {"Authorization": Redacted(f"Bearer {secret.reveal()}")}
 
 
 def test_key_lifecycle_uses_distinct_service_principal_and_once_only_secret(
@@ -105,13 +113,16 @@ def test_key_lifecycle_uses_distinct_service_principal_and_once_only_secret(
     issued = issue(client, admin)
     key = issued["key"]
     assert isinstance(key, dict)
-    secret = str(issued["secret"])
+    secret = issued["secret"]
+    assert isinstance(secret, Redacted)
     assert set(key) == {"id", "name", "prefix", "created_at", "expires_at", "revoked_at"}
-    assert secret.startswith(f"soc_{key['prefix']}.")
-    assert secret not in repr(KeyIssued.model_validate(issued))
+    has_prefix = secret.reveal().startswith(f"soc_{key['prefix']}.")
+    assert has_prefix
+    issued_repr = repr(KeyIssued.model_validate(reveal(issued)))
+    assert_not_disclosed("Issued key representation", issued_repr, secret)
     listing = client.get("/api/api-keys", headers=admin)
     assert listing.status_code == 200 and len(listing.json()["items"]) == 1
-    assert secret not in listing.text
+    assert_not_disclosed("Key listing", listing.text, secret)
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.connect() as db:
@@ -123,8 +134,9 @@ def test_key_lifecycle_uses_distinct_service_principal_and_once_only_secret(
                     text("SELECT username, action, target, details FROM case_activities")
                 ).all()
             )
-        assert stored != secret.encode()
-        assert secret not in audit and stored.hex() not in audit
+        not_plaintext = stored != secret.reveal().encode()
+        assert not_plaintext
+        assert_not_disclosed("Key audit", audit, secret, Redacted(stored.hex()))
         me = client.get("/api/auth/me", headers=bearer(secret))
         assert me.status_code == 200
         assert me.json()["principal"] == {
@@ -196,7 +208,7 @@ def test_api_key_mutations_require_csrf_and_never_fall_back(
     key = issued["key"]
     assert isinstance(key, dict)
     missing = {"Cookie": admin["Cookie"]}
-    forged = {**admin, CSRF_HEADER: secrets.token_urlsafe(32)}
+    forged = {**admin, CSRF_HEADER: Redacted.random()}
     payload = {"name": "new", "ttl_seconds": 600}
     assert client.post("/api/api-keys", headers=missing, json=payload).status_code == 403
     assert client.post("/api/api-keys", headers=forged, json=payload).status_code == 403
@@ -215,13 +227,13 @@ def test_tampered_invalid_and_expired_keys_are_rejected(
     issued = issue(client, admin)
     key = issued["key"]
     assert isinstance(key, dict)
-    secret = str(issued["secret"])
-    replacement = "A" if secret[-1] != "A" else "B"
-    tampered = secret[:-1] + replacement
+    secret = issued["secret"]
+    assert isinstance(secret, Redacted)
+    replacement = "A" if secret.reveal()[-1] != "A" else "B"
+    tampered = Redacted(secret.reveal()[:-1] + replacement)
     assert client.get("/api/auth/me", headers=bearer(tampered)).status_code == 401
-    assert (
-        client.get("/api/auth/me", headers={"Authorization": f"Basic {secret}"}).status_code == 401
-    )
+    basic = {"Authorization": Redacted(f"Basic {secret.reveal()}")}
+    assert client.get("/api/auth/me", headers=basic).status_code == 401
     assert (
         client.get("/api/auth/me", headers={"Authorization": "Bearer invalid"}).status_code == 401
     )
@@ -371,9 +383,10 @@ def test_key_list_is_paginated_and_never_returns_issued_secrets(
     assert first.status_code == second.status_code == 200
     assert len(first.json()["items"]) == 2 and len(second.json()["items"]) == 1
     for key in issued:
-        secret = str(key["secret"])
-        if secret in first.text or secret in second.text:
-            raise AssertionError("Key list disclosed an issued secret")
+        secret = key["secret"]
+        assert isinstance(secret, Redacted)
+        assert_not_disclosed("First key-list page", first.text, secret)
+        assert_not_disclosed("Second key-list page", second.text, secret)
 
 
 def test_key_auth_checks_owner_activity_even_without_prior_revocation(

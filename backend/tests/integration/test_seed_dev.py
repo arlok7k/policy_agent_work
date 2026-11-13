@@ -1,7 +1,6 @@
 """Exercise the development seed in a subprocess against disposable PostgreSQL."""
 
 import os
-import secrets
 import subprocess
 import sys
 import threading
@@ -14,16 +13,17 @@ from argon2 import PasswordHasher
 from scripts import seed_dev
 from sqlalchemy import create_engine, text
 
+from tests.sensitive import Redacted, assert_not_disclosed, reveal
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
-def seed_env(runtime_url: str) -> dict[str, str]:
+def seed_env(runtime_url: str) -> dict[str, str | Redacted]:
     values = {
-        **os.environ,
         "ENV": "development",
-        "DATABASE_URL": runtime_url,
-        "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "DATABASE_URL": Redacted(runtime_url),
+        "SESSION_SIGNING_SECRET": Redacted.random(48),
         "SESSION_TTL_SECONDS": "3600",
         "LOGIN_FAILURE_LIMIT": "5",
         "LOGIN_WINDOW_SECONDS": "60",
@@ -34,9 +34,9 @@ def seed_env(runtime_url: str) -> dict[str, str]:
         "USERNAME_MAX_CHARS": "128",
         "API_KEY_NAME_MAX_CHARS": "128",
         "MAX_API_KEY_TTL_SECONDS": "3600",
-        "SEED_ADMIN_PASSWORD": secrets.token_urlsafe(32),
-        "SEED_SENIOR_ANALYST_PASSWORD": secrets.token_urlsafe(32),
-        "SEED_ANALYST_PASSWORD": secrets.token_urlsafe(32),
+        "SEED_ADMIN_PASSWORD": Redacted.random(),
+        "SEED_SENIOR_ANALYST_PASSWORD": Redacted.random(),
+        "SEED_ANALYST_PASSWORD": Redacted.random(),
         "PYTHONPATH": str(ROOT / "backend"),
     }
     values.pop("DATABASE_URL_FILE", None)
@@ -44,27 +44,29 @@ def seed_env(runtime_url: str) -> dict[str, str]:
     return values
 
 
-def run_seed(env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_seed(env: dict[str, str | Redacted]) -> subprocess.CompletedProcess[str]:
+    process_env = {
+        key: os.environ[key]
+        for key in ("PATH", "HOME", "LANG", "LC_ALL", "LD_LIBRARY_PATH")
+        if key in os.environ
+    }
+    process_env.update(reveal(env))
     result = subprocess.run(  # noqa: S603 - fixed interpreter and fixed script, no shell
         [sys.executable, str(ROOT / "scripts" / "seed_dev.py")],
         cwd=ROOT,
-        env=env,
+        env=process_env,
         capture_output=True,
         text=True,
         timeout=30,
     )
     output = result.stdout + result.stderr
-    sensitive_keys = ["SESSION_SIGNING_SECRET", "DATABASE_URL"]
-    sensitive_keys.extend(
-        key for key in env if key.startswith("SEED_") and key.endswith("_PASSWORD")
-    )
-    if any(env[key] and env[key] in output for key in sensitive_keys if key in env):
-        raise AssertionError("Seed output disclosed environment credentials")
+    protected = [value for value in env.values() if isinstance(value, Redacted)]
+    assert_not_disclosed("Seed process output", output, *protected)
     return result
 
 
 def test_seed_creates_one_argon2_user_per_role_with_correlated_audit(
-    seed_env: dict[str, str], migrated_url: str
+    seed_env: dict[str, str | Redacted], migrated_url: str
 ) -> None:
     result = run_seed(seed_env)
     assert result.returncode == 0
@@ -72,20 +74,27 @@ def test_seed_creates_one_argon2_user_per_role_with_correlated_audit(
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.connect() as db:
-            rows = db.execute(
-                text(
-                    "SELECT u.username, u.password_hash, u.is_active, r.name "
-                    "FROM users u JOIN roles r ON r.id=u.role_id ORDER BY r.name"
+            rows = [
+                (row.username, Redacted(row.password_hash), row.is_active, row.name)
+                for row in db.execute(
+                    text(
+                        "SELECT u.username, u.password_hash, u.is_active, r.name "
+                        "FROM users u JOIN roles r ON r.id=u.role_id ORDER BY r.name"
+                    )
                 )
-            ).all()
+            ]
             activities = db.execute(
                 text("SELECT username, ip, action, details FROM case_activities ORDER BY id")
             ).all()
         assert len(rows) == len(activities) == 3
         hashes = []
         for username, digest, active, role in rows:
-            assert username == role and active is True and digest.startswith("$argon2id$")
-            assert PasswordHasher().verify(digest, seed_env[f"SEED_{role.upper()}_PASSWORD"])
+            is_argon2id = digest.reveal().startswith("$argon2id$")
+            assert username == role and active is True and is_argon2id
+            password = seed_env[f"SEED_{role.upper()}_PASSWORD"]
+            assert isinstance(password, Redacted)
+            verified = PasswordHasher().verify(digest.reveal(), password.reveal())
+            assert verified
             hashes.append(digest)
         assert {row[3] for row in rows} == {"admin", "analyst", "senior_analyst"}
         assert all(
@@ -98,13 +107,11 @@ def test_seed_creates_one_argon2_user_per_role_with_correlated_audit(
         sensitive_values = hashes + [
             value
             for key, value in seed_env.items()
-            if key.startswith("SEED_") and key.endswith("_PASSWORD")
+            if key.startswith("SEED_") and key.endswith("_PASSWORD") and isinstance(value, Redacted)
         ]
-        if any(
-            value in audit_text or value in result.stdout + result.stderr
-            for value in sensitive_values
-        ):
-            raise AssertionError("Seed leaked a password or hash")
+        assert_not_disclosed(
+            "Seed audit or output", audit_text + result.stdout + result.stderr, *sensitive_values
+        )
         again = run_seed(seed_env)
         assert again.returncode != 0
         with engine.connect() as db:
@@ -116,7 +123,7 @@ def test_seed_creates_one_argon2_user_per_role_with_correlated_audit(
 
 @pytest.mark.parametrize("environment", ["production", "test", "", "PRODUCTION"])
 def test_seed_refuses_non_development_before_configuration(environment: str) -> None:
-    env = {**os.environ, "ENV": environment, "PYTHONPATH": str(ROOT / "backend")}
+    env = {"ENV": environment, "PYTHONPATH": str(ROOT / "backend")}
     for key in (
         "DATABASE_URL",
         "DATABASE_URL_FILE",
@@ -130,13 +137,15 @@ def test_seed_refuses_non_development_before_configuration(environment: str) -> 
 
 
 def test_seed_with_missing_or_weak_password_is_atomic(
-    seed_env: dict[str, str], migrated_url: str
+    seed_env: dict[str, str | Redacted], migrated_url: str
 ) -> None:
     missing = dict(seed_env)
     del missing["SEED_SENIOR_ANALYST_PASSWORD"]
     assert run_seed(missing).returncode != 0
     weak = dict(seed_env)
-    weak["SEED_ADMIN_PASSWORD"] = weak["SEED_ADMIN_PASSWORD"][:3]
+    admin_password = weak["SEED_ADMIN_PASSWORD"]
+    assert isinstance(admin_password, Redacted)
+    weak["SEED_ADMIN_PASSWORD"] = Redacted(admin_password.reveal()[:3])
     assert run_seed(weak).returncode != 0
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
@@ -147,8 +156,10 @@ def test_seed_with_missing_or_weak_password_is_atomic(
         engine.dispose()
 
 
-def test_seed_refuses_database_owner_role(seed_env: dict[str, str], migrated_url: str) -> None:
-    seed_env["DATABASE_URL"] = migrated_url
+def test_seed_refuses_database_owner_role(
+    seed_env: dict[str, str | Redacted], migrated_url: str
+) -> None:
+    seed_env["DATABASE_URL"] = Redacted(migrated_url)
     result = run_seed(seed_env)
     assert result.returncode != 0
     assert "RuntimeDatabaseError" in result.stderr
@@ -161,7 +172,7 @@ def test_seed_refuses_database_owner_role(seed_env: dict[str, str], migrated_url
 
 
 def test_seed_rolls_back_partial_inserts_if_audit_fails(
-    seed_env: dict[str, str], migrated_url: str, monkeypatch: pytest.MonkeyPatch
+    seed_env: dict[str, str | Redacted], migrated_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     original = seed_dev.append_activity
     calls = 0
@@ -175,7 +186,7 @@ def test_seed_rolls_back_partial_inserts_if_audit_fails(
 
     monkeypatch.setattr(seed_dev, "append_activity", fail_second)
     with pytest.raises(RuntimeError, match="Simulated audit failure"):
-        seed_dev.seed_dev(seed_env)
+        seed_dev.seed_dev(reveal(seed_env))
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.connect() as db:
@@ -186,7 +197,7 @@ def test_seed_rolls_back_partial_inserts_if_audit_fails(
 
 
 def test_concurrent_seeds_are_serialized_and_never_duplicate_users(
-    seed_env: dict[str, str], migrated_url: str
+    seed_env: dict[str, str | Redacted], migrated_url: str
 ) -> None:
     barrier = threading.Barrier(2)
 

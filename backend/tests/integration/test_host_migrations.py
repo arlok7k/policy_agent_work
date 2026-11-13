@@ -1,7 +1,5 @@
 """Test the host migrations and audit permissions on disposable PostgreSQL."""
 
-import secrets
-
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -13,6 +11,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.core.db import RuntimeDatabaseError, validate_runtime_database_access
 from app.main import app
+from tests.sensitive import Redacted
 
 
 def test_schema_and_seeded_roles(migrated_url: str) -> None:
@@ -52,18 +51,21 @@ def test_schema_and_seeded_roles(migrated_url: str) -> None:
 
 def test_user_constraints_require_normalized_username_and_argon2id(migrated_url: str) -> None:
     engine = create_engine(migrated_url, hide_parameters=True)
-    hashed = PasswordHasher().hash(secrets.token_urlsafe(32))
+    password = Redacted.random()
+    hashed = Redacted(PasswordHasher().hash(password.reveal()))
     insert = text(
         "INSERT INTO users (username, password_hash, role_id) "
         "VALUES (:username, :digest, (SELECT id FROM roles WHERE name = :role))"
     )
     try:
         with engine.begin() as connection:
-            connection.execute(insert, {"username": "alice", "digest": hashed, "role": "analyst"})
-        for username, digest in (("Alice", hashed), ("bob", "not-a-hash")):
+            connection.execute(
+                insert, {"username": "alice", "digest": hashed.reveal(), "role": "analyst"}
+            )
+        for username, digest in (("Alice", hashed), ("bob", Redacted("not-a-hash"))):
             with pytest.raises(IntegrityError), engine.begin() as connection:
                 connection.execute(
-                    insert, {"username": username, "digest": digest, "role": "analyst"}
+                    insert, {"username": username, "digest": digest.reveal(), "role": "analyst"}
                 )
         with engine.connect() as connection:
             assert connection.execute(text("SELECT count(*) FROM users")).scalar_one() == 1
@@ -155,7 +157,8 @@ def test_application_starts_with_restricted_database_login(
     monkeypatch.setenv("ENV", "test")
     monkeypatch.setenv("DATABASE_URL", runtime_url)
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
-    monkeypatch.setenv("SESSION_SIGNING_SECRET", secrets.token_urlsafe(48))
+    signing_secret = Redacted.random(48)
+    monkeypatch.setenv("SESSION_SIGNING_SECRET", signing_secret.reveal())
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     for key, value in {
         "SESSION_TTL_SECONDS": "3600",

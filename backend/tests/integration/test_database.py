@@ -5,21 +5,22 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from pydantic import SecretStr
 from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import Settings
 from app.core.db import create_db_engine, create_session_factory
+from tests.sensitive import Redacted
 
 
 @pytest.fixture
 def settings(disposable_database_url: str) -> Settings:
-    import secrets
-
+    signing_secret = Redacted.random(48)
     return Settings.model_validate(
         {
             "environment": "test",
-            "database_url": disposable_database_url,
-            "session_signing_secret": secrets.token_urlsafe(48),
+            "database_url": SecretStr(disposable_database_url),
+            "session_signing_secret": SecretStr(signing_secret.reveal()),
             "session_ttl_seconds": 3600,
             "login_failure_limit": 5,
             "login_window_seconds": 60,

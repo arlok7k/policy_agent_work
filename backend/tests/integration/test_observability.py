@@ -1,7 +1,6 @@
 """Problem responses, correlated audit events and redacted JSON request logs."""
 
 import json
-import secrets
 from collections.abc import Iterator
 from uuid import UUID, uuid4
 
@@ -15,6 +14,7 @@ from app.core.errors import install_error_handling
 from app.core.logging import logger
 from app.core.security import credential_digest
 from app.main import app
+from tests.sensitive import Redacted, SecretAwareTestClient, assert_not_disclosed, reveal
 
 
 @pytest.fixture
@@ -23,9 +23,9 @@ def observed(
     migrated_url: str,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
-) -> Iterator[tuple[TestClient, str, str, UUID, pytest.LogCaptureFixture]]:
-    password = secrets.token_urlsafe(32)
-    digest = PasswordHasher().hash(password)
+) -> Iterator[tuple[TestClient, Redacted, Redacted, UUID, pytest.LogCaptureFixture]]:
+    password = Redacted.random()
+    digest = Redacted(PasswordHasher().hash(password.reveal()))
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         with engine.begin() as db:
@@ -35,14 +35,14 @@ def observed(
                     "VALUES ('alice', :digest, (SELECT id FROM roles WHERE name='admin')) "
                     "RETURNING id"
                 ),
-                {"digest": digest},
+                {"digest": digest.reveal()},
             ).scalar_one()
     finally:
         engine.dispose()
     values = {
         "ENV": "test",
         "DATABASE_URL": runtime_url,
-        "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "SESSION_SIGNING_SECRET": Redacted.random(48),
         "SESSION_TTL_SECONDS": "3600",
         "LOGIN_FAILURE_LIMIT": "10",
         "LOGIN_WINDOW_SECONDS": "60",
@@ -57,10 +57,12 @@ def observed(
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     for key, value in values.items():
-        monkeypatch.setenv(key, value)
+        monkeypatch.setenv(key, reveal(value))
     logger.addHandler(caplog.handler)
     try:
-        with TestClient(app, base_url="https://testserver", client=("127.0.0.1", 50123)) as client:
+        with SecretAwareTestClient(
+            app, base_url="https://testserver", client=("127.0.0.1", 50123)
+        ) as client:
             yield client, password, digest, user_id, caplog
     finally:
         logger.removeHandler(caplog.handler)
@@ -87,7 +89,8 @@ def _assert_problem(response: object, status: int) -> None:
 
 
 def test_login_logs_and_audit_share_correlation_without_secrets(
-    observed: tuple[TestClient, str, str, UUID, pytest.LogCaptureFixture], migrated_url: str
+    observed: tuple[TestClient, Redacted, Redacted, UUID, pytest.LogCaptureFixture],
+    migrated_url: str,
 ) -> None:
     client, password, digest, user_id, caplog = observed
     correlation = str(uuid4())
@@ -130,15 +133,14 @@ def test_login_logs_and_audit_share_correlation_without_secrets(
     ).hex()
     assert event["principal_id"] == expected_hash and event["principal_id"] != str(user_id)
     combined = caplog.text + response.text
-    if password in combined or digest in combined:
-        raise AssertionError("Log or response disclosed a credential")
+    assert_not_disclosed("Login log or response", combined, password, digest)
 
 
 def test_problem_responses_replace_untrusted_correlation_and_hide_inputs(
-    observed: tuple[TestClient, str, str, UUID, pytest.LogCaptureFixture],
+    observed: tuple[TestClient, Redacted, Redacted, UUID, pytest.LogCaptureFixture],
 ) -> None:
     client, password, digest, _, caplog = observed
-    marker = secrets.token_urlsafe(32)
+    marker = Redacted.random()
     correlation = str(uuid4())
     invalid = client.post(
         "/api/auth/login",
@@ -148,23 +150,24 @@ def test_problem_responses_replace_untrusted_correlation_and_hide_inputs(
     _assert_problem(invalid, 400)
     assert invalid.headers["X-Correlation-Id"] == correlation
     not_found = client.get(
-        f"/not-real/{marker}?token={marker}", headers={"X-Correlation-Id": marker}
+        f"/not-real/{marker.reveal()}?token={marker.reveal()}",
+        headers={"X-Correlation-Id": marker},
     )
     _assert_problem(not_found, 404)
-    assert not_found.headers["X-Correlation-Id"] != marker
+    correlation_replaced = not_found.headers["X-Correlation-Id"] != marker.reveal()
+    assert correlation_replaced
     unauthorized = client.get("/api/users")
     _assert_problem(unauthorized, 401)
     method = client.put("/api/auth/me")
     _assert_problem(method, 405)
     assert "GET" in method.headers["Allow"]
     combined = caplog.text + invalid.text + not_found.text + unauthorized.text + method.text
-    if any(value in combined for value in (marker, password, digest)):
-        raise AssertionError("Request values were reflected into output")
+    assert_not_disclosed("Problem response or log", combined, marker, password, digest)
     assert all("token=" not in str(event["op"]) for event in _events(caplog))
 
 
 def test_csrf_denial_is_a_correlated_problem(
-    observed: tuple[TestClient, str, str, UUID, pytest.LogCaptureFixture],
+    observed: tuple[TestClient, Redacted, Redacted, UUID, pytest.LogCaptureFixture],
 ) -> None:
     client, password, _, _, caplog = observed
     login = client.post("/api/auth/login", json={"username": "alice", "password": password})
@@ -181,19 +184,18 @@ def test_unhandled_exception_is_generic_and_only_its_class_is_logged(
 ) -> None:
     example = FastAPI()
     install_error_handling(example)
-    marker = secrets.token_urlsafe(32)
+    marker = Redacted.random()
 
     @example.get("/probe")
     def probe() -> None:
-        raise RuntimeError(marker)
+        raise RuntimeError(marker.reveal())
 
     logger.addHandler(caplog.handler)
     try:
         with TestClient(example) as client:
             response = client.get("/probe")
         _assert_problem(response, 500)
-        if marker in response.text or marker in caplog.text:
-            raise AssertionError("Exception text leaked")
+        assert_not_disclosed("Exception response or log", response.text + caplog.text, marker)
         event = _events(caplog)[-1]
         assert event["level"] == "ERROR" and event["error_type"] == "RuntimeError"
     finally:
@@ -201,15 +203,15 @@ def test_unhandled_exception_is_generic_and_only_its_class_is_logged(
 
 
 def test_service_key_request_logs_hashed_identity_not_credentials(
-    observed: tuple[TestClient, str, str, UUID, pytest.LogCaptureFixture],
+    observed: tuple[TestClient, Redacted, Redacted, UUID, pytest.LogCaptureFixture],
 ) -> None:
     from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 
     client, password, digest, _, caplog = observed
     login = client.post("/api/auth/login", json={"username": "alice", "password": password})
     assert login.status_code == 200
-    session = login.cookies[SESSION_COOKIE]
-    csrf = login.cookies[CSRF_COOKIE]
+    session = Redacted(login.cookies[SESSION_COOKIE])
+    csrf = Redacted(login.cookies[CSRF_COOKIE])
     created = client.post(
         "/api/api-keys",
         headers={CSRF_HEADER: csrf},
@@ -217,11 +219,13 @@ def test_service_key_request_logs_hashed_identity_not_credentials(
     )
     assert created.status_code == 201
     body = created.json()
-    secret = body["secret"]
+    secret = Redacted(body["secret"])
     key_id = body["key"]["id"]
     client.cookies.clear()
     caplog.clear()
-    response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {secret}"})
+    response = client.get(
+        "/api/auth/me", headers={"Authorization": Redacted(f"Bearer {secret.reveal()}")}
+    )
     assert response.status_code == 200
     event = _events(caplog)[-1]
     assert event["principal_kind"] == "service"
@@ -232,12 +236,13 @@ def test_service_key_request_logs_hashed_identity_not_credentials(
         ).hex()
     )
     combined = caplog.text + response.text
-    if any(value in combined for value in (password, digest, secret, session, csrf)):
-        raise AssertionError("A credential or hash was logged or returned")
+    assert_not_disclosed(
+        "Service request log or response", combined, password, digest, secret, session, csrf
+    )
 
 
 def test_database_failure_returns_generic_correlated_503(
-    observed: tuple[TestClient, str, str, UUID, pytest.LogCaptureFixture],
+    observed: tuple[TestClient, Redacted, Redacted, UUID, pytest.LogCaptureFixture],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from sqlalchemy.exc import OperationalError
@@ -247,10 +252,10 @@ def test_database_failure_returns_generic_correlated_503(
         client.post("/api/auth/login", json={"username": "alice", "password": password}).status_code
         == 200
     )
-    marker = secrets.token_urlsafe(32)
+    marker = Redacted.random()
 
     def broken_factory() -> object:
-        raise OperationalError(marker, {}, RuntimeError(marker))
+        raise OperationalError(marker.reveal(), {}, RuntimeError(marker.reveal()))
 
     monkeypatch.setattr(app.state, "session_factory", broken_factory)
     response = client.get("/api/auth/me")
@@ -258,5 +263,4 @@ def test_database_failure_returns_generic_correlated_503(
     event = _events(caplog)[-1]
     assert event["level"] == "ERROR" and event["outcome"] == "error"
     combined = caplog.text + response.text
-    if any(value in combined for value in (password, digest, marker)):
-        raise AssertionError("Database failure leaked credential or diagnostic values")
+    assert_not_disclosed("Database failure output", combined, password, digest, marker)
