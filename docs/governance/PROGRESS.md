@@ -20,7 +20,7 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 
 | Task | Status | Notes |
 |---|---|---|
-| PB1-R01 | Done locally | Normal short pytest diagnostics and captured output restored; test credentials wrapped; regression retained. Full suite: 131 passed; PR CI pending. |
+| PB1-R01 | Done locally | Normal short pytest diagnostics and captured output restored; test credentials wrapped; regression retained. Full suite: 131 passed; see the PR for CI status. |
 | PB1-R02 | Done | DR-002, DR-006, DR-009 and DR-013 approval is marked to be confirmed because exact owner messages are unavailable in the current context. |
 | PB1-R03 | Done | The four requested PB2/PB4/P1 follow-ups are tracked below; none has been started. |
 
