@@ -5,8 +5,8 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | Task | Status | Notes |
 |---|---|---|
 | PB1-T01 | Done | `make lint test typecheck`: 2 tests passed; scans and pre-commit passed |
-| PB1-T02 | In progress | Typed env/secret-file settings and startup validation |
-| PB1-T03 | Pending | PostgreSQL session layer and Alembic |
+| PB1-T02 | Done | 10 configuration/startup tests; settings and secret-file failures are closed |
+| PB1-T03 | In progress | PostgreSQL session layer and Alembic |
 | PB1-T04 | Pending | Revisions 001–003 and append-only activities |
 | PB1-T05 | Pending | Login/logout/me/reauth, rate limiting, cookies, CSRF |
 | PB1-T06 | Pending | Current principal and legacy role guard |
@@ -21,7 +21,8 @@ Docker is not installed in the sandbox and is not required by PB1. The initial
 mypy run failed because the locally built Python lacked `_sqlite3`; the runtime
 was rebuilt with SQLite support and the same check then passed.
 
-**Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md).
+**Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md),
+[DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md).
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.
