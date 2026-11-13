@@ -1,0 +1,20 @@
+# Hooks use the exact tool versions installed from requirements.lock.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: Ruff lint
+        entry: python -m ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: Ruff format
+        entry: python -m ruff format --check
+        language: system
+        types: [python]
+      - id: mypy
+        name: Mypy application
+        entry: python -m mypy backend/app scripts
+        language: system
+        pass_filenames: false
+        types: [python]

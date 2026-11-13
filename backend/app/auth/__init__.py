@@ -1,0 +1,1 @@
+"""SMART SOC host platform."""
