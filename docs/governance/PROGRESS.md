@@ -16,8 +16,16 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T10 | Done | Public database readiness with real healthy/unreachable checks; 116 tests passed |
 | PB1-T11 | Done | Atomic development-only seed and safe run instructions; 128 tests passed |
 
-**Blockers:** None currently. The owner approved public minimal database
-readiness in [DR-013](../adr/DR-013.md).
+**Blockers:** None currently. The spec's literal DoD-common requires all
+G-A–G-M gates in every phase, but the roadmap introduces several only in P1/P8
+and the owner restricted this request to PB1. The owner confirmed the
+[DR-002](../adr/DR-002.md) interpretation: future-scope gates remain pending,
+not passed, and mandatory in their roadmap phases. PB1's own GitHub Actions
+workflow passed on commit `91c552b` (run 43372484803); later governance gates
+did not run. The updated branch and PR must also pass their own CI runs.
+
+**Resolved:** The owner approved public minimal database readiness in
+[DR-013](../adr/DR-013.md).
 
 **Resolved:** The owner approved option A in
 [DR-009](../adr/DR-009.md), covering the user/API-key wire contracts, key
@@ -72,7 +80,7 @@ the runtime was rebuilt with SQLite support and the same check then passed. The
 downloaded test PostgreSQL package did not include `psql` or `createdb`; the
 disposable database was created through psycopg instead.
 
-**Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md),
+**Decisions:** [DR-001](../adr/DR-001.md), [DR-002 — owner-confirmed](../adr/DR-002.md),
 [DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md),
 [DR-005](../adr/DR-005.md), [DR-006 — owner-approved](../adr/DR-006.md),
 [DR-007 — authentication implementation details](../adr/DR-007.md),
@@ -86,8 +94,9 @@ the owner-approved DR-006 contract and have not received separate owner approval
 [DR-014 — development seed](../adr/DR-014.md) is an implementation decision.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
-round trips, dependency and secret checks are implemented. The PB1 PR workflow
-must pass before the PR is ready; its actual result is recorded on the PR.
+round trips, dependency and secret checks are implemented. The prior push run
+passed on `91c552b`; the PR workflow must also pass before the PR is ready, and
+its actual result will be recorded on the PR.
 Governance coverage, import boundaries, registry, governance OpenAPI, compiler,
 privilege and corpus gates have not been implemented and cannot pass until their
 respective later phases. The spec's literal DoD-common calls for all G-A–G-M
@@ -98,5 +107,11 @@ not claimed as passing here (see DR-002). PB4 frontend/Compose checks are pendin
 quotas require a trusted proxy boundary and upstream volumetric controls. Legal
 review of the LGPL-3.0-only psycopg packages is still needed. The approved public
 health endpoint reveals database readiness to callers who can reach it.
+
+**CI evidence limitation:** GitHub reported the push workflow's successful
+conclusion, but the sandbox could not fetch its log archive from GitHub's log
+host. The CLI error displayed a temporary signed download URL; it is not copied
+here. An optional actions-permissions API lookup also returned HTTP 403; other
+repository, push and workflow-status operations succeeded.
 
 **Next phase:** PB2 remains blocked until PB1 is complete and merged into `main`.
