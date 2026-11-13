@@ -24,6 +24,11 @@ def env_values() -> dict[str, str]:
         "LOGIN_WINDOW_SECONDS": "60",
         "PASSWORD_MIN_CHARS": "14",
         "PASSWORD_MAX_CHARS": "1024",
+        "DEFAULT_PAGE_SIZE": "50",
+        "MAX_PAGE_SIZE": "100",
+        "USERNAME_MAX_CHARS": "128",
+        "API_KEY_NAME_MAX_CHARS": "128",
+        "MAX_API_KEY_TTL_SECONDS": "2592000",
     }
 
 
@@ -126,3 +131,25 @@ def test_invalid_configuration_exits_a_process_without_printing_secrets(
     assert result.returncode != 0
     assert "Application configuration is invalid" in result.stderr
     assert marker not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "DEFAULT_PAGE_SIZE",
+        "MAX_PAGE_SIZE",
+        "USERNAME_MAX_CHARS",
+        "API_KEY_NAME_MAX_CHARS",
+        "MAX_API_KEY_TTL_SECONDS",
+    ],
+)
+def test_required_admin_settings_cannot_be_missing(env_values: dict[str, str], key: str) -> None:
+    del env_values[key]
+    with pytest.raises(ConfigurationError):
+        load_settings(env_values)
+
+
+def test_inverted_pagination_policy_fails(env_values: dict[str, str]) -> None:
+    env_values["DEFAULT_PAGE_SIZE"] = str(int(env_values["MAX_PAGE_SIZE"]) + 1)
+    with pytest.raises(ConfigurationError):
+        load_settings(env_values)

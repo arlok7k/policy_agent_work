@@ -1,6 +1,5 @@
 """Host authentication routes. Authentication state is changed by services."""
 
-from ipaddress import IPv4Address, IPv6Address, ip_address
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -13,20 +12,12 @@ from app.auth.service import AuthFailure, LoginSuccess, login, logout, reauthent
 from app.auth.session import CSRF_COOKIE, SESSION_COOKIE, SessionIdentity
 from app.core.config import Settings
 from app.core.db import get_db
+from app.core.http import request_peer_ip
 from app.core.security import PasswordService
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 Database = Annotated[Session, Depends(get_db)]
 CookieSession = Annotated[SessionIdentity, Depends(current_user)]
-
-
-def _peer_ip(request: Request) -> IPv4Address | IPv6Address:
-    try:
-        if request.client is None:
-            raise ValueError("missing peer")
-        return ip_address(request.client.host)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid request") from None
 
 
 def _failure(result: AuthFailure) -> NoReturn:
@@ -70,7 +61,7 @@ def login_route(
             passwords,
             body.username,
             body.password.get_secret_value(),
-            _peer_ip(request),
+            request_peer_ip(request),
             request.cookies.get(SESSION_COOKIE),
         )
     except SQLAlchemyError:
@@ -100,7 +91,7 @@ def logout_route(request: Request, identity: CookieSession, db: Database) -> Res
     settings: Settings = request.app.state.settings
     token = request.cookies.get(SESSION_COOKIE, "")
     try:
-        revoked = logout(db, settings, token, _peer_ip(request))
+        revoked = logout(db, settings, token, request_peer_ip(request))
     except SQLAlchemyError:
         raise HTTPException(status_code=503, detail="Service unavailable") from None
     if not revoked:
@@ -127,7 +118,7 @@ def reauth_route(
             identity,
             request.cookies.get(SESSION_COOKIE, ""),
             body.password.get_secret_value(),
-            _peer_ip(request),
+            request_peer_ip(request),
         )
     except SQLAlchemyError:
         raise HTTPException(status_code=503, detail="Service unavailable") from None

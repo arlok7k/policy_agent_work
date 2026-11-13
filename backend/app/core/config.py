@@ -48,11 +48,18 @@ class Settings(BaseModel):
     login_window_seconds: PositiveInt
     password_min_chars: PositiveInt
     password_max_chars: PositiveInt
+    default_page_size: PositiveInt
+    max_page_size: PositiveInt
+    username_max_chars: PositiveInt
+    api_key_name_max_chars: PositiveInt
+    max_api_key_ttl_seconds: PositiveInt
 
     @model_validator(mode="after")
-    def valid_password_policy(self) -> Settings:
+    def valid_policies(self) -> Settings:
         if self.password_min_chars > self.password_max_chars:
             raise ValueError("invalid password policy")
+        if self.default_page_size > self.max_page_size:
+            raise ValueError("invalid pagination policy")
         return self
 
     @field_validator("database_url")
@@ -112,6 +119,11 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
                 "login_window_seconds": source.get("LOGIN_WINDOW_SECONDS"),
                 "password_min_chars": source.get("PASSWORD_MIN_CHARS"),
                 "password_max_chars": source.get("PASSWORD_MAX_CHARS"),
+                "default_page_size": source.get("DEFAULT_PAGE_SIZE"),
+                "max_page_size": source.get("MAX_PAGE_SIZE"),
+                "username_max_chars": source.get("USERNAME_MAX_CHARS"),
+                "api_key_name_max_chars": source.get("API_KEY_NAME_MAX_CHARS"),
+                "max_api_key_ttl_seconds": source.get("MAX_API_KEY_TTL_SECONDS"),
             }
         )
     except ValidationError:

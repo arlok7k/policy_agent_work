@@ -16,6 +16,7 @@ from app.core.activity import append_activity
 from app.core.config import Settings
 from app.core.security import PasswordService, credential_digest, new_opaque_token
 from app.users.models import Role, User
+from app.users.validation import normalize_username
 
 PeerIP = IPv4Address | IPv6Address
 
@@ -32,12 +33,13 @@ class LoginSuccess:
     csrf_token: str = field(repr=False)
 
 
-def normalize_username(value: str) -> str:
-    return value.strip().lower()
-
-
 def _candidate(password: str, settings: Settings) -> tuple[str, bool]:
-    return password[: settings.password_max_chars], len(password) <= settings.password_max_chars
+    candidate = password[: settings.password_max_chars]
+    try:
+        candidate.encode("utf-8")
+    except UnicodeError:
+        return candidate.encode("utf-8", errors="replace").decode("utf-8"), False
+    return candidate, len(password) <= settings.password_max_chars
 
 
 def _find_user(db: Session, username: str) -> tuple[User, Role] | None:
@@ -95,9 +97,8 @@ def login(
     ip: PeerIP,
     previous_token: str | None,
 ) -> LoginSuccess | AuthFailure:
-    normalized = normalize_username(username)
-    valid_name = bool(normalized) and len(normalized) <= settings.password_max_chars
-    account = normalized[: settings.password_max_chars] or "unknown"
+    normalized = normalize_username(username, settings)
+    account = normalized if normalized is not None else "<invalid>"
     candidate, valid_length = _candidate(password, settings)
     with db.begin():
         buckets = acquire_buckets(db, settings, account, ip)
@@ -105,7 +106,7 @@ def login(
             # The supplied username is untrusted and could itself contain a secret.
             append_activity(db, username="anonymous", ip=ip, action="auth.login_throttled")
             return AuthFailure.THROTTLED
-        found = _find_user(db, account) if valid_name else None
+        found = _find_user(db, account) if normalized is not None else None
         user = found[0] if found is not None else None
         verified = passwords.verify(candidate, user.password_hash if user is not None else None)
         if not (valid_length and verified and user is not None and user.is_active):

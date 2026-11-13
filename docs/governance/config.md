@@ -13,6 +13,10 @@ starting. Configuration failures do not print supplied values.
 | `SESSION_TTL_SECONDS` | Yes | Positive session lifetime; example 28800. |
 | `LOGIN_FAILURE_LIMIT`, `LOGIN_WINDOW_SECONDS` | Yes | Positive per-source and per-account failure limit and window; examples 5 and 60. |
 | `PASSWORD_MIN_CHARS`, `PASSWORD_MAX_CHARS` | Yes | Positive password policy bounds; examples 14 and 1024, with minimum no greater than maximum. |
+| `DEFAULT_PAGE_SIZE`, `MAX_PAGE_SIZE` | Yes | Positive pagination bounds; example 50 and 100, with default no greater than maximum. |
+| `USERNAME_MAX_CHARS` | Yes | Positive upper bound for normalized usernames; example 128. |
+| `API_KEY_NAME_MAX_CHARS` | Yes | Positive upper bound for API-key names; example 128. |
+| `MAX_API_KEY_TTL_SECONDS` | Yes | Positive maximum API-key lifetime; example 2592000. |
 
 For each pair, setting both is an error rather than choosing precedence. Secret
 files are read as UTF-8; one terminal newline is stripped. Length validation

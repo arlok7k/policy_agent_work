@@ -10,13 +10,25 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T04 | Done | Revisions 001–003, audit trigger/privileges, real up/down; 27 tests passed |
 | PB1-T05 | Done | Cookie authentication, CSRF and step-up; `make check` passed 52 tests |
 | PB1-T06 | Done | Per-request current user and generic deny-by-default role guard; 62 tests passed |
-| PB1-T07 | In progress | Admin users and session revocation |
-| PB1-T08 | Pending | Admin API-key lifecycle and service identity |
+| PB1-T07 | Done | Admin user APIs, race-safe role rechecks and revocation; 88 tests passed |
+| PB1-T08 | In progress | Admin API-key lifecycle and service identity |
 | PB1-T09 | Pending | Problem responses, correlation and JSON logging |
 | PB1-T10 | Pending | Health endpoint |
 | PB1-T11 | Pending | Environment-protected development seed |
 
-**Blockers:** None currently. The original repository contained a root `README.md`
+**Blockers:** None currently. The owner approved option A in
+[DR-009](../adr/DR-009.md), covering the user/API-key wire contracts, key
+transport and administrative recovery protections. PB1-T06 passed
+`make check PYTHON=.venv/bin/python` (62 tests, Ruff and mypy) and pre-commit.
+PB1-T07 passed the same full check with 88 tests. An initial malformed-Unicode
+security test failed in the HTTP test client's encoder before reaching the app;
+the fixture's throwaway password/hash appeared in the default failure output.
+The test was corrected and passed, and [DR-010](../adr/DR-010.md) records the
+redacted failure-output policy and its regression test. The T07 audit reported
+no known vulnerabilities or secret findings across 82 tracked files; all
+pre-commit hooks passed.
+
+**Resolved:** The original repository contained a root `README.md`
 as well as the two reference files; the README was a single project-name heading.
 PB1-T01 added the required reference links and PB1-T01–T04 were committed before
 clarifying the initial-tree exception. Initial PB1-T05 code and tests were also
@@ -46,6 +58,8 @@ disposable database was created through psycopg instead.
 [DR-007 — authentication implementation details](../adr/DR-007.md),
 [DR-008 — legacy role dependency](../adr/DR-008.md). DR-007 and DR-008 implement
 the owner-approved DR-006 contract and have not received separate owner approval.
+[DR-009 — user/API-key details](../adr/DR-009.md) is owner-approved;
+[DR-010 — redacted test output](../adr/DR-010.md) is an implementation decision.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.

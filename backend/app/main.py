@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
 from app.auth.csrf import csrf_guard
+from app.auth.legacy_policy import load_legacy_policy
 from app.auth.router import router as auth_router
 from app.core.config import ConfigurationError, load_settings
 from app.core.db import (
@@ -17,6 +18,7 @@ from app.core.db import (
     validate_runtime_database_access,
 )
 from app.core.security import PasswordService
+from app.users.router import router as users_router
 
 
 @asynccontextmanager
@@ -25,6 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = load_settings()
     except ConfigurationError:
         raise RuntimeError("Application configuration is invalid") from None
+    app.state.legacy_policy = load_legacy_policy()
     engine = create_db_engine(app.state.settings)
     try:
         validate_runtime_database_access(engine)
@@ -48,3 +51,4 @@ app = FastAPI(title="SMART SOC host baseline", lifespan=lifespan)
 app.add_exception_handler(RequestValidationError, invalid_request_handler)
 app.middleware("http")(csrf_guard)
 app.include_router(auth_router)
+app.include_router(users_router)

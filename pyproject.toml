@@ -35,10 +35,14 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["backend"]
 
+[tool.setuptools.package-data]
+"app.auth" = ["legacy_roles.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]
-addopts = "-ra --strict-markers"
+# Avoid printing generated test credentials or hashes in failure tracebacks.
+addopts = "-rN --strict-markers --tb=no --show-capture=no"
 
 [tool.ruff]
 target-version = "py315"

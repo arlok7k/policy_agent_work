@@ -25,6 +25,11 @@ def settings(disposable_database_url: str) -> Settings:
             "login_window_seconds": 60,
             "password_min_chars": 14,
             "password_max_chars": 1024,
+            "default_page_size": 50,
+            "max_page_size": 100,
+            "username_max_chars": 128,
+            "api_key_name_max_chars": 128,
+            "max_api_key_ttl_seconds": 2592000,
         }
     )
 

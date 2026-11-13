@@ -54,6 +54,11 @@ def client(
         "LOGIN_WINDOW_SECONDS": "60",
         "PASSWORD_MIN_CHARS": "14",
         "PASSWORD_MAX_CHARS": "1024",
+        "DEFAULT_PAGE_SIZE": "50",
+        "MAX_PAGE_SIZE": "100",
+        "USERNAME_MAX_CHARS": "128",
+        "API_KEY_NAME_MAX_CHARS": "128",
+        "MAX_API_KEY_TTL_SECONDS": "2592000",
     }
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
@@ -419,3 +424,21 @@ def test_current_user_reads_current_role_from_database_each_request(
         assert client.get("/api/auth/me").json()["principal"]["roles"] == ["admin"]
     finally:
         engine.dispose()
+
+
+def test_invalid_unicode_credentials_are_generic_and_do_not_crash(
+    client: TestClient, account: dict[str, str | UUID]
+) -> None:
+    headers = {"Content-Type": "application/json"}
+    response = client.post(
+        "/api/auth/login",
+        content=json.dumps({"username": account["username"], "password": "\ud800"}),
+        headers=headers,
+    )
+    assert response.status_code == 401
+    response = client.post(
+        "/api/auth/login",
+        content=json.dumps({"username": "\ud800", "password": account["password"]}),
+        headers=headers,
+    )
+    assert response.status_code == 401
