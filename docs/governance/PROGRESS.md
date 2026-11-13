@@ -14,7 +14,7 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T08 | Done | Owned API keys and service-principal auth; 100 tests passed |
 | PB1-T09 | Done | Typed errors, problem responses, correlation and redacted JSON logs; 114 tests passed |
 | PB1-T10 | Done | Public database readiness with real healthy/unreachable checks; 116 tests passed |
-| PB1-T11 | In progress | Environment-protected development seed |
+| PB1-T11 | Done | Atomic development-only seed and safe run instructions; 128 tests passed |
 
 **Blockers:** None currently. The owner approved public minimal database
 readiness in [DR-013](../adr/DR-013.md).
@@ -39,7 +39,14 @@ The T09 audit found no known vulnerabilities or secrets across 95 tracked files;
 pre-commit passed. PB1-T10's two focused health tests and the full
 `make check PYTHON=.venv/bin/python` suite passed (116 tests, Ruff and mypy).
 The T10 audit found no known vulnerabilities or secrets across 98 tracked files;
-pre-commit passed.
+pre-commit passed. Final PB1 verification passed
+`make check PYTHON=.venv/bin/python` (128 tests, Ruff, mypy including scripts).
+The disposable database was separately preflighted, upgraded to revision 003,
+and downgraded to base; only empty Alembic metadata remained. Final review also
+added unit CSRF coverage, a distributed per-account throttle test, and bounded
+writes for requests from an already-blocked source. The final local `make audit`
+found no known vulnerabilities or secrets across 102 tracked files; all
+pre-commit hooks passed.
 
 **Resolved:** The original repository contained a root `README.md`
 as well as the two reference files; the README was a single project-name heading.
@@ -75,12 +82,21 @@ the owner-approved DR-006 contract and have not received separate owner approval
 [DR-010 — redacted test output](../adr/DR-010.md) and
 [DR-011 — key representation](../adr/DR-011.md), and
 [DR-012 — errors and logging](../adr/DR-012.md) are implementation decisions.
-[DR-013 — public health access](../adr/DR-013.md) is owner-approved.
+[DR-013 — public health access](../adr/DR-013.md) is owner-approved;
+[DR-014 — development seed](../adr/DR-014.md) is an implementation decision.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
-round trips, dependency and secret checks apply as their tasks are implemented.
+round trips, dependency and secret checks are implemented. The PB1 PR workflow
+must pass before the PR is ready; its actual result is recorded on the PR.
 Governance coverage, import boundaries, registry, governance OpenAPI, compiler,
 privilege and corpus gates have not been implemented and cannot pass until their
-respective later phases. PB4 frontend and Compose checks are likewise pending.
+respective later phases. The spec's literal DoD-common calls for all G-A–G-M
+at every phase, although the roadmap introduces several only in P1/P8; they are
+not claimed as passing here (see DR-002). PB4 frontend/Compose checks are pending.
+
+**Open risks:** Expired login-throttle buckets have no cleanup job yet; source-IP
+quotas require a trusted proxy boundary and upstream volumetric controls. Legal
+review of the LGPL-3.0-only psycopg packages is still needed. The approved public
+health endpoint reveals database readiness to callers who can reach it.
 
 **Next phase:** PB2 remains blocked until PB1 is complete and merged into `main`.

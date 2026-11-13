@@ -14,7 +14,7 @@ repos:
         types: [python]
       - id: mypy
         name: Mypy application
-        entry: python -m mypy backend/app
+        entry: python -m mypy backend/app scripts
         language: system
         pass_filenames: false
         types: [python]

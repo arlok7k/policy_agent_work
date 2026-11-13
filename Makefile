@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install lint typecheck test check audit lock migrate
+.PHONY: install lint typecheck test check audit lock migrate seed-dev
 
 install:
 	$(PYTHON) -m pip install --require-hashes -r requirements.lock
@@ -10,7 +10,7 @@ lint:
 	$(PYTHON) -m ruff format --check backend scripts
 
 typecheck:
-	$(PYTHON) -m mypy backend/app
+	$(PYTHON) -m mypy backend/app scripts
 
 test:
 	$(PYTHON) -m pytest
@@ -19,6 +19,9 @@ check: lint typecheck test
 
 migrate:
 	PYTHONPATH=backend $(PYTHON) -m alembic upgrade head
+
+seed-dev:
+	PYTHONPATH=backend $(PYTHON) scripts/seed_dev.py
 
 audit:
 	$(PYTHON) -m pip_audit --disable-pip --require-hashes -r requirements.lock --progress-spinner off

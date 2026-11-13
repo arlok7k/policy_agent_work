@@ -52,3 +52,12 @@ turn on SQLAlchemy statement/parameter echo in a deployment.
 readiness and no configuration or error details. Restrict network reachability
 if exposing even this readiness bit is undesirable. Startup itself fails if the
 required database or its runtime privileges are unavailable.
+
+For a development-only initial seed, set `ENV=development`, use the restricted
+runtime database login, and securely supply `SEED_ADMIN_PASSWORD`,
+`SEED_SENIOR_ANALYST_PASSWORD` and `SEED_ANALYST_PASSWORD` in the process
+environment. Passwords must satisfy the configured policy. Then run
+`make seed-dev PYTHON=<python>`. The script refuses every non-development
+setting and any nonempty user table, and creates all role-named accounts or
+none. Do not put real passwords into version control, shell history or logs;
+never point the development environment at a production database.
