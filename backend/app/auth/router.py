@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_cookie_session
+from app.auth.dependencies import current_user
 from app.auth.schemas import AuthResponse, LoginRequest, PrincipalResponse, ReauthRequest
 from app.auth.service import AuthFailure, LoginSuccess, login, logout, reauthenticate
 from app.auth.session import CSRF_COOKIE, SESSION_COOKIE, SessionIdentity
@@ -17,7 +17,7 @@ from app.core.security import PasswordService
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 Database = Annotated[Session, Depends(get_db)]
-CookieSession = Annotated[SessionIdentity, Depends(require_cookie_session)]
+CookieSession = Annotated[SessionIdentity, Depends(current_user)]
 
 
 def _peer_ip(request: Request) -> IPv4Address | IPv6Address:

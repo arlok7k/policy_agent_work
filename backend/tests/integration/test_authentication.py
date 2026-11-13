@@ -399,3 +399,23 @@ def test_login_throttle_window_expires_using_database_time(
         )
     finally:
         engine.dispose()
+
+
+def test_current_user_reads_current_role_from_database_each_request(
+    client: TestClient, account: dict[str, str | UUID], migrated_url: str
+) -> None:
+    login_as(client, account)
+    assert client.get("/api/auth/me").json()["principal"]["roles"] == ["analyst"]
+    engine = create_engine(migrated_url, hide_parameters=True)
+    try:
+        with engine.begin() as db:
+            db.execute(
+                text(
+                    "UPDATE users SET role_id=(SELECT id FROM roles WHERE name='admin') "
+                    "WHERE id=:id"
+                ),
+                {"id": account["id"]},
+            )
+        assert client.get("/api/auth/me").json()["principal"]["roles"] == ["admin"]
+    finally:
+        engine.dispose()

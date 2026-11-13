@@ -9,8 +9,8 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T03 | Done | PostgreSQL 18.6 session/transaction tests and Alembic up/down passed |
 | PB1-T04 | Done | Revisions 001–003, audit trigger/privileges, real up/down; 27 tests passed |
 | PB1-T05 | Done | Cookie authentication, CSRF and step-up; `make check` passed 52 tests |
-| PB1-T06 | In progress | Current principal and legacy role guard |
-| PB1-T07 | Pending | Admin users and session revocation |
+| PB1-T06 | Done | Per-request current user and generic deny-by-default role guard; 62 tests passed |
+| PB1-T07 | In progress | Admin users and session revocation |
 | PB1-T08 | Pending | Admin API-key lifecycle and service identity |
 | PB1-T09 | Pending | Problem responses, correlation and JSON logging |
 | PB1-T10 | Pending | Health endpoint |
@@ -43,8 +43,9 @@ disposable database was created through psycopg instead.
 **Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md),
 [DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md),
 [DR-005](../adr/DR-005.md), [DR-006 — owner-approved](../adr/DR-006.md),
-[DR-007 — authentication implementation details](../adr/DR-007.md); DR-007 has not
-received separate owner approval.
+[DR-007 — authentication implementation details](../adr/DR-007.md),
+[DR-008 — legacy role dependency](../adr/DR-008.md). DR-007 and DR-008 implement
+the owner-approved DR-006 contract and have not received separate owner approval.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.

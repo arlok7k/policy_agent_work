@@ -8,7 +8,7 @@ from app.auth.session import SESSION_COOKIE, SessionIdentity, identity_from_rows
 from app.core.config import Settings
 
 
-def require_cookie_session(request: Request) -> SessionIdentity:
+def current_user(request: Request) -> SessionIdentity:
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(
