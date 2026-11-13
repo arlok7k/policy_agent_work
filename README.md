@@ -17,10 +17,10 @@ Governance Plane are not yet implemented. See the phase progress before use.
 1. Install Python 3.15.2, create a virtual environment, and run `make install
    PYTHON=<venv-python>` to install the hash-pinned dependencies.
 2. Provision PostgreSQL and the required settings and secrets as described in
-   [backend configuration](docs/governance/config.md). Run `make migrate` with
-   a DDL-capable database login. Have the database administrator provision a
-   separate unprivileged login inheriting `hpb_app`, then configure the service
-   with that runtime login instead of the migration credentials.
+   [backend configuration](docs/governance/config.md). Run `make migrate
+   PYTHON=<venv-python>` with a DDL-capable database login. Have the database
+   administrator provision a separate unprivileged login inheriting `hpb_app`,
+   then configure the service with that runtime login instead of migration credentials.
 3. For development only, provide the three seed passwords securely and run
    `make seed-dev PYTHON=<venv-python>`. The seed refuses a non-development
    environment or a nonempty user table.

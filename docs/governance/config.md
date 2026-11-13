@@ -24,8 +24,9 @@ cannot establish entropy: operators must provision a random value. Do not commit
 or log secret values. Test secrets are generated at runtime and discarded.
 
 Alembic reads only `DATABASE_URL` or `DATABASE_URL_FILE`; it does not require the
-session-signing secret. Run upgrades with `make migrate` after provisioning the
-database URL. Never run a downgrade against a non-disposable database.
+session-signing secret. Run upgrades with `make migrate PYTHON=<venv-python>` after
+provisioning the database URL. Never run a downgrade against a non-disposable
+database.
 
 Database tests require `TEST_DATABASE_URL` to point to a genuinely disposable
 PostgreSQL database named with an `_test` suffix, plus
