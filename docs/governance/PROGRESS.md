@@ -4,7 +4,7 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 
 | Task | Status | Notes |
 |---|---|---|
-| PB1-T01 | Done | `make lint test typecheck`: 2 tests passed; scans and pre-commit passed |
+| PB1-T01 | Done | Scaffold and empty future-package directories; initial checks passed |
 | PB1-T02 | Done | 10 configuration/startup tests; settings and secret-file failures are closed |
 | PB1-T03 | Done | PostgreSQL 18.6 session/transaction tests and Alembic up/down passed |
 | PB1-T04 | Done | Revisions 001–003, audit trigger/privileges, real up/down; 27 tests passed |
