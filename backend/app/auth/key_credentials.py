@@ -5,13 +5,14 @@ import re
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.models import ApiKey
 from app.core.config import Settings
+from app.core.exceptions import Unauthenticated, Unavailable
 from app.core.security import credential_digest, new_opaque_token
 from app.users.models import User
 
@@ -41,7 +42,7 @@ def authenticate_api_key(request: Request) -> UUID:
     scheme, separator, secret = header.partition(" ")
     matched = _TOKEN.fullmatch(secret) if scheme.lower() == "bearer" and separator else None
     if matched is None:
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        raise Unauthenticated()
     settings: Settings = request.app.state.settings
     factory: sessionmaker[Session] = request.app.state.session_factory
     digest = credential_digest(settings.session_signing_secret, "api-key", secret)
@@ -61,7 +62,7 @@ def authenticate_api_key(request: Request) -> UUID:
             stored = key.key_digest if key is not None else bytes(len(digest))
             valid = hmac.compare_digest(stored, digest)
             if key is None or not valid:
-                raise HTTPException(status_code=401, detail="Authentication failed")
+                raise Unauthenticated()
             return key.id
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None

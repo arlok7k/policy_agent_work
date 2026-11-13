@@ -2,9 +2,10 @@
 
 from ipaddress import IPv4Address, IPv6Address, ip_address
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 
 from app.core.config import Settings
+from app.core.exceptions import BadRequest, SemanticError
 
 PeerIP = IPv4Address | IPv6Address
 
@@ -15,11 +16,11 @@ def request_peer_ip(request: Request) -> PeerIP:
             raise ValueError("missing peer")
         return ip_address(request.client.host)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid request") from None
+        raise BadRequest() from None
 
 
 def page_size(settings: Settings, requested: int | None) -> int:
     size = settings.default_page_size if requested is None else requested
     if size <= 0 or size > settings.max_page_size:
-        raise HTTPException(status_code=422, detail="Invalid request")
+        raise SemanticError()
     return size

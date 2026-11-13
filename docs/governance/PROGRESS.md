@@ -12,8 +12,8 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T06 | Done | Per-request current user and generic deny-by-default role guard; 62 tests passed |
 | PB1-T07 | Done | Admin user APIs, race-safe role rechecks and revocation; 88 tests passed |
 | PB1-T08 | Done | Owned API keys and service-principal auth; 100 tests passed |
-| PB1-T09 | In progress | Problem responses, correlation and JSON logging |
-| PB1-T10 | Pending | Health endpoint |
+| PB1-T09 | Done | Typed errors, problem responses, correlation and redacted JSON logs; 114 tests passed |
+| PB1-T10 | In progress | Health endpoint |
 | PB1-T11 | Pending | Environment-protected development seed |
 
 **Blockers:** None currently. The owner approved option A in
@@ -30,6 +30,10 @@ pre-commit hooks passed. PB1-T08 passed `make check PYTHON=.venv/bin/python`
 (100 tests, Ruff and mypy), including owned-key IDOR, revocation, service-role
 isolation and mid-request demotion tests. The T08 audit found no known
 vulnerabilities or secret findings across 88 tracked files; pre-commit passed.
+PB1-T09 passed `make check PYTHON=.venv/bin/python` (114 tests, Ruff and mypy),
+including correlated audit records and credential-safe success/failure logs.
+The T09 audit found no known vulnerabilities or secrets across 95 tracked files;
+pre-commit passed.
 
 **Resolved:** The original repository contained a root `README.md`
 as well as the two reference files; the README was a single project-name heading.
@@ -63,7 +67,8 @@ disposable database was created through psycopg instead.
 the owner-approved DR-006 contract and have not received separate owner approval.
 [DR-009 — user/API-key details](../adr/DR-009.md) is owner-approved;
 [DR-010 — redacted test output](../adr/DR-010.md) and
-[DR-011 — key representation](../adr/DR-011.md) are implementation decisions.
+[DR-011 — key representation](../adr/DR-011.md), and
+[DR-012 — errors and logging](../adr/DR-012.md) are implementation decisions.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.

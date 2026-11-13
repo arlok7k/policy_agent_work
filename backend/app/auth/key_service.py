@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from datetime import timedelta
 from uuid import UUID
 
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +14,7 @@ from app.auth.session import SessionIdentity
 from app.auth.transactions import lock_authorized_actor
 from app.core.activity import append_activity
 from app.core.config import Settings
+from app.core.exceptions import NotFound, SemanticError
 from app.core.http import PeerIP
 
 
@@ -65,18 +65,18 @@ def create_key(
     try:
         name.encode("utf-8")
     except UnicodeError:
-        raise HTTPException(status_code=422, detail="Invalid request") from None
+        raise SemanticError() from None
     if not name or len(name) > settings.api_key_name_max_chars:
-        raise HTTPException(status_code=422, detail="Invalid request")
+        raise SemanticError()
     if not 0 < body.ttl_seconds <= settings.max_api_key_ttl_seconds:
-        raise HTTPException(status_code=422, detail="Invalid request")
+        raise SemanticError()
     with db.begin():
         actor, _ = lock_authorized_actor(db, settings, token, identity, roles)
         now = db.execute(select(func.clock_timestamp())).scalar_one()
         try:
             expires_at = now + timedelta(seconds=body.ttl_seconds)
         except OverflowError:
-            raise HTTPException(status_code=422, detail="Invalid request") from None
+            raise SemanticError() from None
         credential = new_key_credential(settings)
         key = ApiKey(
             owner_user_id=actor.user_id,
@@ -111,7 +111,7 @@ def revoke_key(
         )
         key = db.execute(query).scalar_one_or_none()
         if key is None:
-            raise HTTPException(status_code=404, detail="Not found")
+            raise NotFound()
         if key.revoked_at is None:
             key.revoked_at = db.execute(select(func.clock_timestamp())).scalar_one()
             append_activity(

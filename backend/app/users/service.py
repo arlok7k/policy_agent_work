@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 
-from fastapi import HTTPException
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
@@ -11,6 +10,7 @@ from app.auth.session import SessionIdentity
 from app.auth.transactions import lock_authorized_actor
 from app.core.activity import append_activity
 from app.core.config import Settings
+from app.core.exceptions import Conflict, NotFound, SemanticError
 from app.core.http import PeerIP
 from app.core.security import PasswordService
 from app.users.models import Role, User
@@ -32,7 +32,7 @@ def _view(user: User, role: Role) -> UserView:
 def _role(db: Session, name: str) -> Role:
     role = db.execute(select(Role).where(Role.name == name)).scalar_one_or_none()
     if role is None:
-        raise HTTPException(status_code=422, detail="Invalid request")
+        raise SemanticError()
     return role
 
 
@@ -71,7 +71,7 @@ def create_user(
     username = normalize_username(body.username, settings)
     password = body.password.get_secret_value()
     if username is None or not valid_password(password, settings):
-        raise HTTPException(status_code=422, detail="Invalid request")
+        raise SemanticError()
     password_hash = passwords.hash_password(password)
     with db.begin():
         actor, _ = lock_authorized_actor(db, settings, token, identity, roles)
@@ -99,7 +99,7 @@ def update_user(
     if body.password is not None:
         password = body.password.get_secret_value()
         if not valid_password(password, settings):
-            raise HTTPException(status_code=422, detail="Invalid request")
+            raise SemanticError()
         password_hash = passwords.hash_password(password)
     with db.begin():
         actor, users = lock_authorized_actor(
@@ -107,11 +107,11 @@ def update_user(
         )
         user = users.get(body.id)
         if user is None:
-            raise HTTPException(status_code=404, detail="Not found")
+            raise NotFound()
         if body.id == actor.user_id and (
             body.is_active is False or (body.role is not None and body.role != actor.role)
         ):
-            raise HTTPException(status_code=409, detail="Request denied")
+            raise Conflict()
         role = _role(db, body.role) if body.role is not None else db.get_one(Role, user.role_id)
         if body.role is not None:
             user.role_id = role.id

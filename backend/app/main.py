@@ -3,9 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from starlette.responses import JSONResponse
+from fastapi import FastAPI
 
 from app.auth.csrf import csrf_guard
 from app.auth.key_router import router as key_router
@@ -18,6 +16,7 @@ from app.core.db import (
     create_session_factory,
     validate_runtime_database_access,
 )
+from app.core.errors import install_error_handling
 from app.core.security import PasswordService
 from app.users.router import router as users_router
 
@@ -43,14 +42,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine.dispose()
 
 
-async def invalid_request_handler(request: Request, error: Exception) -> JSONResponse:
-    """Do not echo validation inputs, which can include credentials."""
-    return JSONResponse({"detail": "Invalid request"}, status_code=400)
-
-
 app = FastAPI(title="SMART SOC host baseline", lifespan=lifespan)
-app.add_exception_handler(RequestValidationError, invalid_request_handler)
 app.middleware("http")(csrf_guard)
+install_error_handling(app)
 app.include_router(auth_router)
 app.include_router(key_router)
 app.include_router(users_router)

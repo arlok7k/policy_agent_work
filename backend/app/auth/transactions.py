@@ -3,13 +3,13 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.roles import require_roles
 from app.auth.session import SessionIdentity, identity_from_rows, session_rows
 from app.core.config import Settings
+from app.core.exceptions import Unauthenticated
 from app.users.models import User
 
 
@@ -32,7 +32,7 @@ def lock_authorized_actor(
     locked = {user.id: user for user in users}
     rows = session_rows(db, settings, token, lock=True)
     if rows is None or rows[0].id != identity.session_id or rows[1].id != identity.user_id:
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        raise Unauthenticated()
     actual = identity_from_rows(rows)
     require_roles(*allowed_roles)(actual)
     return actual, locked

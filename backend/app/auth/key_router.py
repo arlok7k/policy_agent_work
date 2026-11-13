@@ -4,7 +4,7 @@ import sys
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from app.auth.roles import operation_roles, require_operation
 from app.auth.session import SESSION_COOKIE, SessionIdentity
 from app.core.config import Settings
 from app.core.db import get_db
+from app.core.exceptions import Unavailable
 from app.core.http import page_size, request_peer_ip
 
 router = APIRouter(prefix="/api/api-keys", tags=["api-keys"])
@@ -42,7 +43,7 @@ def keys_list(
             offset,
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     response.headers["Cache-Control"] = "no-store"
     return result
 
@@ -63,7 +64,7 @@ def keys_create(
             request_peer_ip(request),
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     response.headers["Cache-Control"] = "no-store"
     return result
 
@@ -82,5 +83,5 @@ def keys_delete(request: Request, identity: KeyAdmin, db: Database, id: UUID) ->
             request_peer_ip(request),
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})

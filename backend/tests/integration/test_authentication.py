@@ -6,7 +6,7 @@ import secrets
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from ipaddress import ip_address
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from argon2 import PasswordHasher, Type
@@ -218,10 +218,15 @@ def test_wrong_and_unknown_credentials_are_generic_and_rate_limited(
     client: TestClient, account: dict[str, str | UUID]
 ) -> None:
     wrong = secrets.token_urlsafe(32)
+    headers = {"X-Correlation-Id": str(uuid4())}
     first = client.post(
-        "/api/auth/login", json={"username": account["username"], "password": wrong}
+        "/api/auth/login",
+        headers=headers,
+        json={"username": account["username"], "password": wrong},
     )
-    second = client.post("/api/auth/login", json={"username": "unknown", "password": wrong})
+    second = client.post(
+        "/api/auth/login", headers=headers, json={"username": "unknown", "password": wrong}
+    )
     assert first.status_code == second.status_code == 401
     assert first.json() == second.json()
     assert (

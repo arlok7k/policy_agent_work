@@ -3,7 +3,7 @@
 import sys
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ from app.auth.roles import operation_roles, require_operation
 from app.auth.session import SESSION_COOKIE, SessionIdentity
 from app.core.config import Settings
 from app.core.db import get_db
+from app.core.exceptions import Conflict, Unavailable
 from app.core.http import page_size, request_peer_ip
 from app.core.security import PasswordService
 from app.users.schemas import UserCreate, UserPage, UserPatch, UserView
@@ -51,7 +52,7 @@ def users_list(
             offset,
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     response.headers["Cache-Control"] = "no-store"
     return result
 
@@ -75,10 +76,10 @@ def users_create(
         )
     except IntegrityError as error:
         if _username_conflict(error):
-            raise HTTPException(status_code=409, detail="Request conflict") from None
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+            raise Conflict() from None
+        raise Unavailable() from None
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     response.headers["Cache-Control"] = "no-store"
     return result
 
@@ -101,6 +102,6 @@ def users_update(
             request_peer_ip(request),
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     response.headers["Cache-Control"] = "no-store"
     return result

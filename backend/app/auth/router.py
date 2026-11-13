@@ -2,7 +2,7 @@
 
 from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,9 @@ from app.auth.service import AuthFailure, LoginSuccess, login, logout, reauthent
 from app.auth.session import CSRF_COOKIE, SESSION_COOKIE, SessionIdentity
 from app.core.config import Settings
 from app.core.db import get_db
+from app.core.exceptions import Throttled, Unauthenticated, Unavailable
 from app.core.http import request_peer_ip
+from app.core.logging import mark_principal
 from app.core.security import PasswordService
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
@@ -23,8 +25,8 @@ CurrentPrincipal = Annotated[PrincipalResponse, Depends(current_principal)]
 
 def _failure(result: AuthFailure) -> NoReturn:
     if result == AuthFailure.THROTTLED:
-        raise HTTPException(status_code=429, detail="Authentication temporarily unavailable")
-    raise HTTPException(status_code=401, detail="Authentication failed")
+        raise Throttled()
+    raise Unauthenticated()
 
 
 def _set_auth_cookies(response: Response, result: LoginSuccess, settings: Settings) -> None:
@@ -66,9 +68,10 @@ def login_route(
             request.cookies.get(SESSION_COOKIE),
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     if isinstance(result, AuthFailure):
         _failure(result)
+    mark_principal(request, "user", result.principal.id)
     _set_auth_cookies(response, result, settings)
     return AuthResponse(principal=result.principal)
 
@@ -86,9 +89,9 @@ def logout_route(request: Request, identity: CookieSession, db: Database) -> Res
     try:
         revoked = logout(db, settings, token, request_peer_ip(request))
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     if not revoked:
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        raise Unauthenticated()
     response = Response(
         status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"}
     )
@@ -114,7 +117,7 @@ def reauth_route(
             request_peer_ip(request),
         )
     except SQLAlchemyError:
-        raise HTTPException(status_code=503, detail="Service unavailable") from None
+        raise Unavailable() from None
     if outcome is not None:
         _failure(outcome)
     return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})

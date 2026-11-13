@@ -40,3 +40,10 @@ validate the non-login `hpb_app` role. The service must instead use a separate,
 unprivileged login that inherits `hpb_app`. At startup the service verifies that
 its login and effective role cannot mutate the activity log or own its table,
 schema or database; unsafe or unavailable database access aborts startup.
+
+HTTP responses include a safe UUIDv4 `X-Correlation-Id`. Application request
+logs are JSON and omit bodies, headers, query strings and raw principal IDs;
+activity events include the correlation ID. Deploy the server with access logs
+disabled (for Uvicorn, `--no-access-log`) unless the server and proxy log formats
+have been independently configured not to record raw URLs or credentials. Do not
+turn on SQLAlchemy statement/parameter echo in a deployment.

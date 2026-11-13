@@ -3,10 +3,11 @@
 from collections.abc import Callable, Mapping
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 
 from app.auth.dependencies import current_user
 from app.auth.session import SessionIdentity
+from app.core.exceptions import Forbidden, Unavailable
 
 
 def require_roles(*allowed_roles: str) -> Callable[[SessionIdentity], SessionIdentity]:
@@ -17,7 +18,7 @@ def require_roles(*allowed_roles: str) -> Callable[[SessionIdentity], SessionIde
 
     def check(identity: Annotated[SessionIdentity, Depends(current_user)]) -> SessionIdentity:
         if identity.role not in allowed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request denied")
+            raise Forbidden()
         return identity
 
     return check
@@ -27,7 +28,7 @@ def operation_roles(request: Request, operation: str) -> tuple[str, ...]:
     rules: Mapping[str, tuple[str, ...]] = request.app.state.legacy_policy
     roles = rules.get(operation)
     if not roles:
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise Unavailable()
     return roles
 
 

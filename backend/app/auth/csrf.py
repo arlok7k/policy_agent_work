@@ -7,10 +7,11 @@ from fastapi import Request
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import JSONResponse, Response
+from starlette.responses import Response
 
 from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE, session_rows
 from app.core.config import Settings
+from app.core.errors import problem_response
 from app.core.security import credential_digest
 
 CallNext = Callable[[Request], Awaitable[Response]]
@@ -42,10 +43,9 @@ def _check_csrf(request: Request, token: str) -> int | None:
 async def csrf_guard(request: Request, call_next: CallNext) -> Response:
     token = request.cookies.get(SESSION_COOKIE)
     if token and request.headers.get("Authorization") is not None:
-        return JSONResponse({"detail": "Authentication failed"}, status_code=401)
+        return problem_response(request, 401)
     if token and request.method not in {"GET", "HEAD", "OPTIONS"}:
         status = await run_in_threadpool(_check_csrf, request, token)
         if status is not None:
-            detail = "Service unavailable" if status == 503 else "Request denied"
-            return JSONResponse({"detail": detail}, status_code=status)
+            return problem_response(request, status)
     return await call_next(request)
