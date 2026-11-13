@@ -19,6 +19,11 @@ def env_values() -> dict[str, str]:
         "ENV": "test",
         "DATABASE_URL": "postgresql+psycopg:///disposable_test",
         "SESSION_SIGNING_SECRET": secrets.token_urlsafe(48),
+        "SESSION_TTL_SECONDS": "28800",
+        "LOGIN_FAILURE_LIMIT": "5",
+        "LOGIN_WINDOW_SECONDS": "60",
+        "PASSWORD_MIN_CHARS": "14",
+        "PASSWORD_MAX_CHARS": "1024",
     }
 
 
@@ -78,9 +83,28 @@ def test_invalid_values_are_generic(env_values: dict[str, str], key: str) -> Non
     assert marker not in repr(error.value)
 
 
-def test_application_refuses_startup_without_a_secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENV", "test")
-    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg:///disposable_test")
+@pytest.mark.parametrize(
+    "key",
+    ["SESSION_TTL_SECONDS", "LOGIN_FAILURE_LIMIT", "LOGIN_WINDOW_SECONDS", "PASSWORD_MIN_CHARS"],
+)
+def test_nonpositive_security_settings_fail(env_values: dict[str, str], key: str) -> None:
+    env_values[key] = "0"
+    with pytest.raises(ConfigurationError):
+        load_settings(env_values)
+
+
+def test_inverted_password_policy_fails(env_values: dict[str, str]) -> None:
+    env_values["PASSWORD_MIN_CHARS"] = str(int(env_values["PASSWORD_MAX_CHARS"]) + 1)
+    with pytest.raises(ConfigurationError):
+        load_settings(env_values)
+
+
+def test_application_refuses_startup_without_a_secret(
+    monkeypatch: pytest.MonkeyPatch, env_values: dict[str, str]
+) -> None:
+    for key, value in env_values.items():
+        if key != "SESSION_SIGNING_SECRET":
+            monkeypatch.setenv(key, value)
     monkeypatch.delenv("SESSION_SIGNING_SECRET", raising=False)
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
     with pytest.raises(RuntimeError, match="Application configuration is invalid"), TestClient(app):

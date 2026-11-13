@@ -10,6 +10,9 @@ starting. Configuration failures do not print supplied values.
 | `ENV` | Yes | `development`, `test`, or `production`. |
 | `DATABASE_URL` / `DATABASE_URL_FILE` | Exactly one | SQLAlchemy PostgreSQL URL using `postgresql+psycopg`. The URL may contain credentials and is treated as secret. |
 | `SESSION_SIGNING_SECRET` / `SESSION_SIGNING_SECRET_FILE` | Exactly one | Cryptographically random secret with at least 32 bytes of entropy, supplied by an operator. |
+| `SESSION_TTL_SECONDS` | Yes | Positive session lifetime; example 28800. |
+| `LOGIN_FAILURE_LIMIT`, `LOGIN_WINDOW_SECONDS` | Yes | Positive per-source and per-account failure limit and window; examples 5 and 60. |
+| `PASSWORD_MIN_CHARS`, `PASSWORD_MAX_CHARS` | Yes | Positive password policy bounds; examples 14 and 1024, with minimum no greater than maximum. |
 
 For each pair, setting both is an error rather than choosing precedence. Secret
 files are read as UTF-8; one terminal newline is stripped. Length validation

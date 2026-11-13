@@ -20,6 +20,11 @@ def settings(disposable_database_url: str) -> Settings:
             "environment": "test",
             "database_url": disposable_database_url,
             "session_signing_secret": secrets.token_urlsafe(48),
+            "session_ttl_seconds": 3600,
+            "login_failure_limit": 5,
+            "login_window_seconds": 60,
+            "password_min_chars": 14,
+            "password_max_chars": 1024,
         }
     )
 

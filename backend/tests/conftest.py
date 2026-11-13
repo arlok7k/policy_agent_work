@@ -5,6 +5,8 @@ from collections.abc import Iterator
 from uuid import uuid4
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -34,3 +36,31 @@ def disposable_database_url() -> Iterator[str]:
         with engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))  # noqa: S608
         engine.dispose()
+
+
+@pytest.fixture
+def migrated_url(disposable_database_url: str, monkeypatch: pytest.MonkeyPatch) -> str:
+    monkeypatch.setenv("DATABASE_URL", disposable_database_url)
+    monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
+    command.upgrade(Config("alembic.ini"), "head")
+    return disposable_database_url
+
+
+@pytest.fixture
+def runtime_url(migrated_url: str) -> Iterator[str]:
+    if os.environ.get("TEST_PG_CLUSTER_DISPOSABLE") != "1":
+        pytest.fail("Temporary role tests require TEST_PG_CLUSTER_DISPOSABLE=1")
+    role = f"test_runtime_{uuid4().hex}"
+    owner_engine = create_engine(migrated_url, hide_parameters=True)
+    with owner_engine.begin() as connection:
+        # The role name is generated solely from UUID hex, not user input.
+        connection.execute(text(f'CREATE ROLE "{role}" LOGIN INHERIT'))  # noqa: S608
+        connection.execute(text(f'GRANT hpb_app TO "{role}"'))  # noqa: S608
+    try:
+        runtime = make_url(migrated_url)._replace(username=role, password=None)
+        yield runtime.render_as_string(hide_password=False)
+    finally:
+        # The explicit disposable-cluster guard is required before dropping roles.
+        with owner_engine.begin() as connection:
+            connection.execute(text(f'DROP ROLE "{role}"'))  # noqa: S608
+        owner_engine.dispose()

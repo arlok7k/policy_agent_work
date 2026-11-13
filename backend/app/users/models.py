@@ -34,4 +34,4 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
-    role: Mapped[Role] = relationship(lazy="joined")
+    role: Mapped[Role] = relationship(lazy="select")

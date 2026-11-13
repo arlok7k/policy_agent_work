@@ -1,9 +1,6 @@
 """Test the host migrations and audit permissions on disposable PostgreSQL."""
 
-import os
 import secrets
-from collections.abc import Iterator
-from uuid import uuid4
 
 import pytest
 from alembic import command
@@ -16,34 +13,6 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.core.db import RuntimeDatabaseError, validate_runtime_database_access
 from app.main import app
-
-
-@pytest.fixture
-def migrated_url(disposable_database_url: str, monkeypatch: pytest.MonkeyPatch) -> str:
-    monkeypatch.setenv("DATABASE_URL", disposable_database_url)
-    monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
-    command.upgrade(Config("alembic.ini"), "head")
-    return disposable_database_url
-
-
-@pytest.fixture
-def runtime_url(migrated_url: str) -> Iterator[str]:
-    if os.environ.get("TEST_PG_CLUSTER_DISPOSABLE") != "1":
-        pytest.fail("Temporary role tests require TEST_PG_CLUSTER_DISPOSABLE=1")
-    role = f"test_runtime_{uuid4().hex}"
-    owner_engine = create_engine(migrated_url, hide_parameters=True)
-    with owner_engine.begin() as connection:
-        # The role name is generated solely from UUID hex, not user input.
-        connection.execute(text(f'CREATE ROLE "{role}" LOGIN INHERIT'))  # noqa: S608
-        connection.execute(text(f'GRANT hpb_app TO "{role}"'))  # noqa: S608
-    try:
-        runtime = make_url(migrated_url)._replace(username=role, password=None)
-        yield runtime.render_as_string(hide_password=False)
-    finally:
-        # The explicit disposable-cluster guard is required before dropping roles.
-        with owner_engine.begin() as connection:
-            connection.execute(text(f'DROP ROLE "{role}"'))  # noqa: S608
-        owner_engine.dispose()
 
 
 def test_schema_and_seeded_roles(migrated_url: str) -> None:
@@ -188,6 +157,14 @@ def test_application_starts_with_restricted_database_login(
     monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
     monkeypatch.setenv("SESSION_SIGNING_SECRET", secrets.token_urlsafe(48))
     monkeypatch.delenv("SESSION_SIGNING_SECRET_FILE", raising=False)
+    for key, value in {
+        "SESSION_TTL_SECONDS": "3600",
+        "LOGIN_FAILURE_LIMIT": "5",
+        "LOGIN_WINDOW_SECONDS": "60",
+        "PASSWORD_MIN_CHARS": "14",
+        "PASSWORD_MAX_CHARS": "1024",
+    }.items():
+        monkeypatch.setenv(key, value)
     with TestClient(app) as client:
         assert client.get("/openapi.json").status_code == 200
 

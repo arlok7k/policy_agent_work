@@ -8,28 +8,43 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T02 | Done | 10 configuration/startup tests; settings and secret-file failures are closed |
 | PB1-T03 | Done | PostgreSQL 18.6 session/transaction tests and Alembic up/down passed |
 | PB1-T04 | Done | Revisions 001–003, audit trigger/privileges, real up/down; 27 tests passed |
-| PB1-T05 | In progress | Login/logout/me/reauth, rate limiting, cookies, CSRF |
-| PB1-T06 | Pending | Current principal and legacy role guard |
+| PB1-T05 | Done | Cookie authentication, CSRF and step-up; `make check` passed 52 tests |
+| PB1-T06 | In progress | Current principal and legacy role guard |
 | PB1-T07 | Pending | Admin users and session revocation |
 | PB1-T08 | Pending | Admin API-key lifecycle and service identity |
 | PB1-T09 | Pending | Problem responses, correlation and JSON logging |
 | PB1-T10 | Pending | Health endpoint |
 | PB1-T11 | Pending | Environment-protected development seed |
 
-**Blockers:** None currently. PB1-T04 hit two consecutive Ruff E501 line-length
-failures; work was stopped, the owner authorized correcting the SQL string, and
-lint plus the full T04 suite subsequently passed. The owner approved the earlier
-data-model, security and public API contract in [DR-006](../adr/DR-006.md).
-PostgreSQL 18.6 is running locally in a disposable,
-Unix-socket-only test cluster. Docker is not installed in the sandbox and is not
-required by PB1. The initial mypy run failed because the locally built Python
-lacked `_sqlite3`; the runtime was rebuilt with SQLite support and the same check
-then passed. The downloaded test PostgreSQL package did not include `psql` or
-`createdb`; the disposable database was created through psycopg instead.
+**Blockers:** None currently. The original repository contained a root `README.md`
+as well as the two reference files; the README was a single project-name heading.
+PB1-T01 added the required reference links and PB1-T01–T04 were committed before
+clarifying the initial-tree exception. Initial PB1-T05 code and tests were also
+written. The owner subsequently approved treating that README as permitted
+boilerplate, keeping the links and continuing PB1 on the current branch. The
+T05 verification after review passed `make check PYTHON=.venv/bin/python` (52
+tests, Ruff and mypy); this does not establish PB1 completion. T05's first
+additional lint run reported two S105 false positives on numeric password-length
+settings; the test was revised and the subsequent lint run passed. `make audit`
+found no known vulnerabilities or secrets (67 tracked files). Pre-commit initially
+failed because its system hooks selected `/usr/bin/python` instead of the virtual
+environment; rerunning with `.venv/bin` on `PATH` passed all three hooks.
+
+PB1-T04 previously hit two consecutive Ruff E501 line-length failures; the owner
+authorized correcting the SQL string, and lint plus the full T04 suite passed.
+The owner approved the earlier data-model, security and public API contract in
+[DR-006](../adr/DR-006.md). PostgreSQL 18.6 runs locally in a disposable,
+Unix-socket-only test cluster. Docker is not installed and is not required by
+PB1. The initial mypy run failed because locally built Python lacked `_sqlite3`;
+the runtime was rebuilt with SQLite support and the same check then passed. The
+downloaded test PostgreSQL package did not include `psql` or `createdb`; the
+disposable database was created through psycopg instead.
 
 **Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md),
 [DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md),
-[DR-005](../adr/DR-005.md), [DR-006 — owner-approved](../adr/DR-006.md).
+[DR-005](../adr/DR-005.md), [DR-006 — owner-approved](../adr/DR-006.md),
+[DR-007 — authentication implementation details](../adr/DR-007.md); DR-007 has not
+received separate owner approval.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.

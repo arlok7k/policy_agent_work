@@ -8,7 +8,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    PositiveInt,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
@@ -35,6 +43,17 @@ class Settings(BaseModel):
     environment: Literal["development", "test", "production"]
     database_url: SecretStr
     session_signing_secret: SecretStr
+    session_ttl_seconds: PositiveInt
+    login_failure_limit: PositiveInt
+    login_window_seconds: PositiveInt
+    password_min_chars: PositiveInt
+    password_max_chars: PositiveInt
+
+    @model_validator(mode="after")
+    def valid_password_policy(self) -> Settings:
+        if self.password_min_chars > self.password_max_chars:
+            raise ValueError("invalid password policy")
+        return self
 
     @field_validator("database_url")
     @classmethod
@@ -88,6 +107,11 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
                 "environment": source.get("ENV", ""),
                 "database_url": SecretStr(_read_secret("DATABASE_URL", source)),
                 "session_signing_secret": SecretStr(_read_secret("SESSION_SIGNING_SECRET", source)),
+                "session_ttl_seconds": source.get("SESSION_TTL_SECONDS"),
+                "login_failure_limit": source.get("LOGIN_FAILURE_LIMIT"),
+                "login_window_seconds": source.get("LOGIN_WINDOW_SECONDS"),
+                "password_min_chars": source.get("PASSWORD_MIN_CHARS"),
+                "password_max_chars": source.get("PASSWORD_MAX_CHARS"),
             }
         )
     except ValidationError:
