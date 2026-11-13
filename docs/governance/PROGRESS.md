@@ -11,8 +11,8 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T05 | Done | Cookie authentication, CSRF and step-up; `make check` passed 52 tests |
 | PB1-T06 | Done | Per-request current user and generic deny-by-default role guard; 62 tests passed |
 | PB1-T07 | Done | Admin user APIs, race-safe role rechecks and revocation; 88 tests passed |
-| PB1-T08 | In progress | Admin API-key lifecycle and service identity |
-| PB1-T09 | Pending | Problem responses, correlation and JSON logging |
+| PB1-T08 | Done | Owned API keys and service-principal auth; 100 tests passed |
+| PB1-T09 | In progress | Problem responses, correlation and JSON logging |
 | PB1-T10 | Pending | Health endpoint |
 | PB1-T11 | Pending | Environment-protected development seed |
 
@@ -26,7 +26,10 @@ the fixture's throwaway password/hash appeared in the default failure output.
 The test was corrected and passed, and [DR-010](../adr/DR-010.md) records the
 redacted failure-output policy and its regression test. The T07 audit reported
 no known vulnerabilities or secret findings across 82 tracked files; all
-pre-commit hooks passed.
+pre-commit hooks passed. PB1-T08 passed `make check PYTHON=.venv/bin/python`
+(100 tests, Ruff and mypy), including owned-key IDOR, revocation, service-role
+isolation and mid-request demotion tests. The T08 audit found no known
+vulnerabilities or secret findings across 88 tracked files; pre-commit passed.
 
 **Resolved:** The original repository contained a root `README.md`
 as well as the two reference files; the README was a single project-name heading.
@@ -59,7 +62,8 @@ disposable database was created through psycopg instead.
 [DR-008 — legacy role dependency](../adr/DR-008.md). DR-007 and DR-008 implement
 the owner-approved DR-006 contract and have not received separate owner approval.
 [DR-009 — user/API-key details](../adr/DR-009.md) is owner-approved;
-[DR-010 — redacted test output](../adr/DR-010.md) is an implementation decision.
+[DR-010 — redacted test output](../adr/DR-010.md) and
+[DR-011 — key representation](../adr/DR-011.md) are implementation decisions.
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.

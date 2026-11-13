@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import current_user
+from app.auth.dependencies import current_principal, current_user
 from app.auth.schemas import AuthResponse, LoginRequest, PrincipalResponse, ReauthRequest
 from app.auth.service import AuthFailure, LoginSuccess, login, logout, reauthenticate
 from app.auth.session import CSRF_COOKIE, SESSION_COOKIE, SessionIdentity
@@ -18,6 +18,7 @@ from app.core.security import PasswordService
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 Database = Annotated[Session, Depends(get_db)]
 CookieSession = Annotated[SessionIdentity, Depends(current_user)]
+CurrentPrincipal = Annotated[PrincipalResponse, Depends(current_principal)]
 
 
 def _failure(result: AuthFailure) -> NoReturn:
@@ -73,17 +74,9 @@ def login_route(
 
 
 @router.get("/me", response_model=AuthResponse)
-def me_route(response: Response, identity: CookieSession) -> AuthResponse:
+def me_route(response: Response, principal: CurrentPrincipal) -> AuthResponse:
     response.headers["Cache-Control"] = "no-store"
-    return AuthResponse(
-        principal=PrincipalResponse(
-            kind="user",
-            id=identity.user_id,
-            username=identity.username,
-            roles=[identity.role],
-            reauth_at=identity.reauth_at,
-        )
-    )
+    return AuthResponse(principal=principal)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

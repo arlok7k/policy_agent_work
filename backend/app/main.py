@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
 from app.auth.csrf import csrf_guard
+from app.auth.key_router import router as key_router
 from app.auth.legacy_policy import load_legacy_policy
 from app.auth.router import router as auth_router
 from app.core.config import ConfigurationError, load_settings
@@ -51,4 +52,5 @@ app = FastAPI(title="SMART SOC host baseline", lifespan=lifespan)
 app.add_exception_handler(RequestValidationError, invalid_request_handler)
 app.middleware("http")(csrf_guard)
 app.include_router(auth_router)
+app.include_router(key_router)
 app.include_router(users_router)
