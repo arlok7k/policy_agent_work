@@ -17,6 +17,16 @@ class ConfigurationError(Exception):
     """Configuration is missing or invalid; messages never include secret values."""
 
 
+def _validate_database_url(value: SecretStr) -> SecretStr:
+    try:
+        url = make_url(value.get_secret_value())
+    except ArgumentError:
+        raise ValueError("invalid PostgreSQL database URL") from None
+    if url.drivername != "postgresql+psycopg" or not url.database:
+        raise ValueError("a PostgreSQL psycopg database URL is required")
+    return value
+
+
 class Settings(BaseModel):
     """Settings needed before serving any requests."""
 
@@ -29,13 +39,7 @@ class Settings(BaseModel):
     @field_validator("database_url")
     @classmethod
     def valid_database_url(cls, value: SecretStr) -> SecretStr:
-        try:
-            url = make_url(value.get_secret_value())
-        except ArgumentError:
-            raise ValueError("invalid PostgreSQL database URL") from None
-        if url.drivername != "postgresql+psycopg" or not url.database:
-            raise ValueError("a PostgreSQL psycopg database URL is required")
-        return value
+        return _validate_database_url(value)
 
     @field_validator("session_signing_secret")
     @classmethod
@@ -64,6 +68,15 @@ def _read_secret(name: str, environ: Mapping[str, str]) -> str:
     if not value:
         raise ConfigurationError(f"{name} must not be empty")
     return value
+
+
+def load_database_url(environ: Mapping[str, str] | None = None) -> SecretStr:
+    """Load the DB secret without granting migrations access to other secrets."""
+    source = os.environ if environ is None else environ
+    try:
+        return _validate_database_url(SecretStr(_read_secret("DATABASE_URL", source)))
+    except ValueError:
+        raise ConfigurationError("Invalid database configuration") from None
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:

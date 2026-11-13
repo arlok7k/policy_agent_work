@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.config import ConfigurationError, Settings, load_settings
+from app.core.config import ConfigurationError, Settings, load_database_url, load_settings
 from app.main import app
 
 
@@ -28,6 +28,15 @@ def test_valid_inline_settings_are_typed_and_masked(env_values: dict[str, str]) 
     assert settings.environment == "test"
     assert settings.database_url.get_secret_value() == env_values["DATABASE_URL"]
     assert env_values["SESSION_SIGNING_SECRET"] not in repr(settings)
+
+
+def test_migrations_can_load_only_a_database_secret(env_values: dict[str, str]) -> None:
+    assert (
+        load_database_url({"DATABASE_URL": env_values["DATABASE_URL"]}).get_secret_value()
+        == (env_values["DATABASE_URL"])
+    )
+    with pytest.raises(ConfigurationError, match="Invalid database"):
+        load_database_url({"DATABASE_URL": "invalid"})
 
 
 def test_secret_files_load_without_terminal_newline(

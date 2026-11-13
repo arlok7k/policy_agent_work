@@ -6,8 +6,8 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 |---|---|---|
 | PB1-T01 | Done | `make lint test typecheck`: 2 tests passed; scans and pre-commit passed |
 | PB1-T02 | Done | 10 configuration/startup tests; settings and secret-file failures are closed |
-| PB1-T03 | In progress | PostgreSQL session layer and Alembic |
-| PB1-T04 | Pending | Revisions 001–003 and append-only activities |
+| PB1-T03 | Done | PostgreSQL 18.6 session/transaction tests and Alembic up/down passed |
+| PB1-T04 | In progress | Revisions 001–003 and append-only activities |
 | PB1-T05 | Pending | Login/logout/me/reauth, rate limiting, cookies, CSRF |
 | PB1-T06 | Pending | Current principal and legacy role guard |
 | PB1-T07 | Pending | Admin users and session revocation |
@@ -16,13 +16,16 @@ Current phase: **PB1 — backend skeleton, database core, authentication**
 | PB1-T10 | Pending | Health endpoint |
 | PB1-T11 | Pending | Environment-protected development seed |
 
-**Blockers:** None currently; required PostgreSQL tests still need execution.
-Docker is not installed in the sandbox and is not required by PB1. The initial
-mypy run failed because the locally built Python lacked `_sqlite3`; the runtime
-was rebuilt with SQLite support and the same check then passed.
+**Blockers:** None currently. PostgreSQL 18.6 is running locally in a disposable,
+Unix-socket-only test cluster. Docker is not installed in the sandbox and is not
+required by PB1. The initial mypy run failed because the locally built Python
+lacked `_sqlite3`; the runtime was rebuilt with SQLite support and the same check
+then passed. The downloaded test PostgreSQL package did not include `psql` or
+`createdb`; the disposable database was created through psycopg instead.
 
 **Decisions:** [DR-001](../adr/DR-001.md), [DR-002](../adr/DR-002.md),
-[DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md).
+[DR-003](../adr/DR-003.md), [DR-004](../adr/DR-004.md),
+[DR-005](../adr/DR-005.md).
 
 **CI scope:** PB1 lint/type checks, unit/integration/security tests, migration
 round trips, dependency and secret checks apply as their tasks are implemented.

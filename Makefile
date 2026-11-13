@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install lint typecheck test check audit lock
+.PHONY: install lint typecheck test check audit lock migrate
 
 install:
 	$(PYTHON) -m pip install --require-hashes -r requirements.lock
@@ -16,6 +16,9 @@ test:
 	$(PYTHON) -m pytest
 
 check: lint typecheck test
+
+migrate:
+	PYTHONPATH=backend $(PYTHON) -m alembic upgrade head
 
 audit:
 	$(PYTHON) -m pip_audit --disable-pip --require-hashes -r requirements.lock --progress-spinner off
