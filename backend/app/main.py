@@ -17,6 +17,7 @@ from app.core.db import (
     validate_runtime_database_access,
 )
 from app.core.errors import install_error_handling
+from app.core.health import router as health_router
 from app.core.security import PasswordService
 from app.users.router import router as users_router
 
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="SMART SOC host baseline", lifespan=lifespan)
 app.middleware("http")(csrf_guard)
 install_error_handling(app)
+app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(key_router)
 app.include_router(users_router)

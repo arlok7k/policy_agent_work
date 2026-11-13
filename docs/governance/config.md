@@ -47,3 +47,8 @@ activity events include the correlation ID. Deploy the server with access logs
 disabled (for Uvicorn, `--no-access-log`) unless the server and proxy log formats
 have been independently configured not to record raw URLs or credentials. Do not
 turn on SQLAlchemy statement/parameter echo in a deployment.
+
+`GET /api/health` is intentionally public per DR-013. It reports only database
+readiness and no configuration or error details. Restrict network reachability
+if exposing even this readiness bit is undesirable. Startup itself fails if the
+required database or its runtime privileges are unavailable.
