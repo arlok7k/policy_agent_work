@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install lint typecheck test check audit lock migrate seed-dev
+.PHONY: install lint typecheck test check audit lock migrate seed-dev openapi openapi-check
 
 install:
 	$(PYTHON) -m pip install --require-hashes -r requirements.lock
@@ -15,7 +15,13 @@ typecheck:
 test:
 	$(PYTHON) -m pytest
 
-check: lint typecheck test
+openapi:
+	PYTHONPATH=backend $(PYTHON) scripts/export_openapi.py
+
+openapi-check:
+	PYTHONPATH=backend $(PYTHON) scripts/export_openapi.py --check
+
+check: lint typecheck openapi-check test
 
 migrate:
 	PYTHONPATH=backend $(PYTHON) -m alembic upgrade head
