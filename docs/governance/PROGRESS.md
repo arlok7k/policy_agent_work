@@ -17,7 +17,7 @@ namespace: 131 tests, Ruff and mypy. `make audit` and pre-commit also passed.
 | PB2-T05 | Done | Deterministic mock-only IP verdicts, deadline degradation, DB-authoritative Redis cache, bounded bulk and stats; [DR-018](../adr/DR-018.md). The affected isolated suite passed 31 tests. |
 | PB2-T06 | Done | Three deterministic `mock=true` AI routes with minimized alert context and no governance data; [DR-019](../adr/DR-019.md). The affected isolated suite passed 18 tests. |
 | PB2-T07 | Done | Bounded incident creation, scoped evidence and transactional investigation/audit with both mock adapters; [DR-020](../adr/DR-020.md). The affected isolated suite passed 46 tests. |
-| PB2-T08 | In progress | Full legacy authorization characterization matrix. |
+| PB2-T08 | Done | Every host operation is inventoried and exercised across active roles, service, inactive, unlisted and anonymous principals, including CSRF and fail-closed policy checks; [DR-021](../adr/DR-021.md). The affected isolated suite passed 42 tests. |
 | PB2-T09 | Not started | Host OpenAPI export, schema/status contracts and isolated CI. |
 
 PB2-T02's first lint run found an unused import, and its first mypy run found a
@@ -39,6 +39,10 @@ PB2-T07 had two consecutive Ruff E501 failures on three unchanged long SQL
 literals; the owner selected **“Fix and continue”** when asked whether to split
 those literals and continue. They were split without changing SQL or tests, and
 subsequent Ruff, mypy and the affected network-isolated suite passed.
+PB2-T08's first expanded suite had one test-fixture failure: pytest 9.2's
+attribute patch restoration removed a dynamically stored Starlette `State`
+attribute after the first loop iteration. Patching its backing mapping preserves
+the original entry; the repeat run passed all 42 tests without reducing checks.
 
 ## PB1 completed tasks
 
@@ -184,7 +188,7 @@ Security-boundary choices must follow the specification's owner-decision process
 |---|---|---|---|
 | PB4-FU01 | PB4 | Not started | Implement a trusted Nginx/proxy boundary so rate limits and audit use the real client IP. Nginx must strip or overwrite externally supplied `X-Forwarded-For` at ingress; the backend may trust forwarding information only from explicitly configured proxy hops. Test legitimate forwarding and spoofed headers both directly and through Nginx. |
 | PB4-FU02 | PB4 | Not started | Define and test a safe local HTTP development cookie flow without weakening production: production session cookies must retain `Secure` and existing protections, and an insecure development setting must not silently apply in production. Document the development boundary and test both environments. |
-| PB2-PB4-FU01 | PB2/PB4 | Not started | Schedule cleanup of expired `auth_login_throttle` rows when the relevant scheduler/infrastructure exists. Use database time and a reviewed bounded policy; test that cleanup does not reset active limits or race concurrent login attempts. |
+| PB2-PB4-FU01 | PB2/PB4 | In progress | Celery Beat is available. Schedule bounded, database-time cleanup of expired `auth_login_throttle` rows and test preservation of active limits under concurrent login. |
 | P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
 
 **Next phase:** Finish PB2, open its PR and wait for the owner's review and
