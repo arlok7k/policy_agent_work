@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from redis import Redis
 
+from app.ai.providers import MockLLM
+from app.ai.router import router as ai_router
 from app.alerts.router import router as alerts_router
 from app.alerts.webhook import router as webhook_router
 from app.auth.csrf import csrf_guard
@@ -53,6 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.celery = create_celery(pb2)
     app.state.threat_provider = MockProvider()
+    app.state.llm_provider = MockLLM()
     try:
         yield
     finally:
@@ -71,3 +74,4 @@ app.include_router(users_router)
 app.include_router(webhook_router)
 app.include_router(alerts_router)
 app.include_router(threat_intel_router)
+app.include_router(ai_router)
