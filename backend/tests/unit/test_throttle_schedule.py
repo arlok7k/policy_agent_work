@@ -4,7 +4,12 @@ import pytest
 from celery.beat import Scheduler
 
 from app.core.pb2_config import load_pb2_settings
-from app.jobs.celery_app import CLEANUP_SCHEDULE, CLEANUP_THROTTLE_TASK, create_celery
+from app.jobs.celery_app import (
+    CLEANUP_SCHEDULE,
+    CLEANUP_THROTTLE_TASK,
+    RECONCILE_RESPONSE_SCHEDULE,
+    create_celery,
+)
 
 
 def test_beat_schedule_is_bounded_configured_and_attributed() -> None:
@@ -12,7 +17,7 @@ def test_beat_schedule_is_bounded_configured_and_attributed() -> None:
     celery = create_celery(settings)
     try:
         scheduler = Scheduler(app=celery)
-        assert set(scheduler.schedule) == {CLEANUP_SCHEDULE}
+        assert set(scheduler.schedule) == {CLEANUP_SCHEDULE, RECONCILE_RESPONSE_SCHEDULE}
         entry = scheduler.schedule[CLEANUP_SCHEDULE]
         assert entry.task == CLEANUP_THROTTLE_TASK
         assert entry.options["headers"]["initiator"] == settings.throttle_cleanup_initiator

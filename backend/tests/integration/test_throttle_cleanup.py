@@ -17,7 +17,11 @@ from sqlalchemy import create_engine, text
 from app.auth.service import AuthFailure, login
 from app.auth.throttle import cleanup_expired_buckets
 from app.core.security import credential_digest
-from app.jobs.celery_app import CLEANUP_SCHEDULE, CLEANUP_THROTTLE_TASK
+from app.jobs.celery_app import (
+    CLEANUP_SCHEDULE,
+    CLEANUP_THROTTLE_TASK,
+    RECONCILE_RESPONSE_SCHEDULE,
+)
 from app.main import app
 from tests.integration.conftest import PB2API
 from tests.sensitive import Redacted
@@ -227,7 +231,7 @@ def test_real_beat_dispatch_requires_initiator_and_worker_runs_cleanup(pb2_api: 
     publisher = Celery("untrusted-test-publisher", broker=os.environ["TEST_REDIS_BROKER_URL"])
     try:
         scheduler = Scheduler(app=app.state.celery)
-        assert set(scheduler.schedule) == {CLEANUP_SCHEDULE}
+        assert set(scheduler.schedule) == {CLEANUP_SCHEDULE, RECONCILE_RESPONSE_SCHEDULE}
         entry = scheduler.schedule[CLEANUP_SCHEDULE]
         assert entry.options["headers"]["initiator"] == "service:test-throttle-cleanup"
         with start_worker(
