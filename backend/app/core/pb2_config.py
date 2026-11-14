@@ -37,6 +37,9 @@ class PB2Settings(BaseModel):
     threat_intel_bulk_max_items: PositiveInt
     incident_max_alerts: PositiveInt
     incident_max_text_chars: PositiveInt
+    throttle_cleanup_interval_seconds: PositiveInt
+    throttle_cleanup_batch_size: PositiveInt
+    throttle_cleanup_initiator: str
     celery_broker_url: SecretStr
     redis_cache_url: SecretStr
 
@@ -47,7 +50,7 @@ class PB2Settings(BaseModel):
             raise ValueError("webhook secret is too short")
         return value
 
-    @field_validator("webhook_initiator")
+    @field_validator("webhook_initiator", "throttle_cleanup_initiator")
     @classmethod
     def validate_initiator(cls, value: str) -> str:
         if re.fullmatch(r"service:[A-Za-z0-9][A-Za-z0-9._:-]*", value, flags=re.ASCII) is None:
@@ -93,6 +96,11 @@ def load_pb2_settings(environ: Mapping[str, str] | None = None) -> PB2Settings:
                 "threat_intel_bulk_max_items": source.get("THREAT_INTEL_BULK_MAX_ITEMS"),
                 "incident_max_alerts": source.get("INCIDENT_MAX_ALERTS"),
                 "incident_max_text_chars": source.get("INCIDENT_MAX_TEXT_CHARS"),
+                "throttle_cleanup_interval_seconds": source.get(
+                    "THROTTLE_CLEANUP_INTERVAL_SECONDS"
+                ),
+                "throttle_cleanup_batch_size": source.get("THROTTLE_CLEANUP_BATCH_SIZE"),
+                "throttle_cleanup_initiator": source.get("THROTTLE_CLEANUP_INITIATOR", ""),
                 "celery_broker_url": SecretStr(_read_secret("CELERY_BROKER_URL", source)),
                 "redis_cache_url": SecretStr(_read_secret("REDIS_CACHE_URL", source)),
             }

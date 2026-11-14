@@ -26,6 +26,8 @@ starting. Configuration failures do not print supplied values.
 | `THREAT_INTEL_CACHE_TTL_SECONDS` | Yes | Positive cache lifetime; example 3600. |
 | `THREAT_INTEL_BULK_MAX_ITEMS` | Yes | Positive maximum indicators per request; example 100. |
 | `INCIDENT_MAX_ALERTS`, `INCIDENT_MAX_TEXT_CHARS` | Yes | Positive incident alert-count and text bounds; examples 100 and 4096. |
+| `THROTTLE_CLEANUP_INTERVAL_SECONDS`, `THROTTLE_CLEANUP_BATCH_SIZE` | Yes | Positive scheduler interval and maximum rows per cleanup; examples 300 and 500. |
+| `THROTTLE_CLEANUP_INITIATOR` | Yes | Stable `service:<name>` identity attached to scheduled cleanup tasks. |
 | `CELERY_BROKER_URL` / `CELERY_BROKER_URL_FILE` | Exactly one | Redis broker URL; treated as a secret because it may contain credentials. |
 | `REDIS_CACHE_URL` / `REDIS_CACHE_URL_FILE` | Exactly one | URL of a separate Redis cache instance; treated as a secret. |
 
@@ -37,6 +39,18 @@ at startup but does not claim Redis readiness until a request actually uses it.
 The PB4 infrastructure has not yet been built. Start a worker with the same
 required settings and restricted database login as the API:
 `PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery worker -Q default`.
+Start one Beat process with the same configuration and a durable writable schedule
+file, for example:
+
+```sh
+PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery beat \
+  --schedule=/var/lib/smart-soc/celerybeat-schedule
+```
+
+Provision that directory outside the repository. All API and worker replicas must share an identical
+`LOGIN_WINDOW_SECONDS`; see [DR-022](../adr/DR-022.md) for the cleanup's locking,
+bounds and configuration-drift risk. Stopping Beat leaves expired rows for later
+cleanup but does not disable the login-time expiry check.
 Broker access is a trust boundary: an initiator header is required, but is not
 itself authenticated against a compromised broker. Tasks use late
 acknowledgement and are redelivered on worker loss; other failures still require

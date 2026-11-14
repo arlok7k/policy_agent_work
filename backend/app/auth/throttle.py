@@ -3,7 +3,7 @@
 from datetime import timedelta
 from ipaddress import IPv4Address, IPv6Address
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, literal, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -50,3 +50,25 @@ def blocked(buckets: list[LoginThrottle], settings: Settings) -> bool:
 def record_failure(buckets: list[LoginThrottle]) -> None:
     for bucket in buckets:
         bucket.failure_count += 1
+
+
+def cleanup_expired_buckets(db: Session, *, window_seconds: int, batch_size: int) -> int:
+    """Delete one bounded batch, skipping rows held by concurrent logins."""
+    if window_seconds <= 0 or batch_size <= 0:
+        raise ValueError("Cleanup bounds must be positive")
+    now = db.execute(select(func.clock_timestamp())).scalar_one()
+    cutoff = now - timedelta(seconds=window_seconds)
+    candidates = (
+        select(LoginThrottle.bucket_digest)
+        .where(LoginThrottle.window_started_at <= cutoff)
+        .order_by(LoginThrottle.window_started_at, LoginThrottle.bucket_digest)
+        .limit(batch_size)
+        .with_for_update(skip_locked=True)
+        .cte("expired_throttles")
+    )
+    statement = (
+        delete(LoginThrottle)
+        .where(LoginThrottle.bucket_digest == candidates.c.bucket_digest)
+        .returning(literal(1))
+    )
+    return len(db.execute(statement).scalars().all())

@@ -11,6 +11,8 @@ from kombu import Queue
 from app.core.pb2_config import PB2Settings
 
 NORMALIZE_ALERT_TASK = "app.jobs.normalize_alert"
+CLEANUP_THROTTLE_TASK = "app.jobs.cleanup_login_throttles"
+CLEANUP_SCHEDULE = "cleanup-expired-login-throttles"
 
 
 def require_initiator(headers: object) -> str:
@@ -63,6 +65,19 @@ def create_celery(settings: PB2Settings) -> Celery:
         accept_content=["json"],
         result_serializer="json",
         task_ignore_result=True,
+        result_expires=None,
+        beat_schedule={
+            CLEANUP_SCHEDULE: {
+                "task": CLEANUP_THROTTLE_TASK,
+                "schedule": settings.throttle_cleanup_interval_seconds,
+                "options": {
+                    "queue": "default",
+                    "headers": {"initiator": settings.throttle_cleanup_initiator},
+                    "argsrepr": "<redacted>",
+                    "kwargsrepr": "<redacted>",
+                },
+            }
+        },
         task_acks_late=True,
         task_reject_on_worker_lost=True,
         task_publish_retry=False,

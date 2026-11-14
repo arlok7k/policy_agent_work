@@ -18,7 +18,7 @@ namespace: 131 tests, Ruff and mypy. `make audit` and pre-commit also passed.
 | PB2-T06 | Done | Three deterministic `mock=true` AI routes with minimized alert context and no governance data; [DR-019](../adr/DR-019.md). The affected isolated suite passed 18 tests. |
 | PB2-T07 | Done | Bounded incident creation, scoped evidence and transactional investigation/audit with both mock adapters; [DR-020](../adr/DR-020.md). The affected isolated suite passed 46 tests. |
 | PB2-T08 | Done | Every host operation is inventoried and exercised across active roles, service, inactive, unlisted and anonymous principals, including CSRF and fail-closed policy checks; [DR-021](../adr/DR-021.md). The affected isolated suite passed 42 tests. |
-| PB2-T09 | Not started | Host OpenAPI export, schema/status contracts and isolated CI. |
+| PB2-T09 | In progress | Host OpenAPI export, schema/status contracts and isolated CI. |
 
 PB2-T02's first lint run found an unused import, and its first mypy run found a
 third-party Redis type-parameter mismatch; both were corrected before the
@@ -43,6 +43,10 @@ PB2-T08's first expanded suite had one test-fixture failure: pytest 9.2's
 attribute patch restoration removed a dynamically stored Starlette `State`
 attribute after the first loop iteration. Patching its backing mapping preserves
 the original entry; the repeat run passed all 42 tests without reducing checks.
+PB2-PB4-FU01's first Ruff check found one unsorted import; it was fixed and the
+repeat checks passed. The affected isolated suite passed 65 tests, including a
+real Beat dispatch, worker initiator enforcement, database-clock bounded cleanup,
+active throttles and concurrent login/cleanup races.
 
 ## PB1 completed tasks
 
@@ -167,8 +171,9 @@ respective later phases. The spec's literal DoD-common calls for all G-A–G-M
 at every phase, although the roadmap introduces several only in P1/P8; they are
 not claimed as passing here (see DR-002). PB4 frontend/Compose checks are pending.
 
-**Open risks:** Expired login-throttle buckets have no cleanup job yet; source-IP
-quotas require a trusted proxy boundary and upstream volumetric controls. Legal
+**Open risks:** Login-throttle cleanup requires Beat to run and all API/worker
+replicas to share the same login window; source-IP quotas require a trusted
+proxy boundary and upstream volumetric controls. Legal
 review of the LGPL-3.0-only psycopg packages is still needed. The implemented
 public health endpoint reveals database readiness to callers who can reach it;
 its approval evidence is to be confirmed.
@@ -188,7 +193,7 @@ Security-boundary choices must follow the specification's owner-decision process
 |---|---|---|---|
 | PB4-FU01 | PB4 | Not started | Implement a trusted Nginx/proxy boundary so rate limits and audit use the real client IP. Nginx must strip or overwrite externally supplied `X-Forwarded-For` at ingress; the backend may trust forwarding information only from explicitly configured proxy hops. Test legitimate forwarding and spoofed headers both directly and through Nginx. |
 | PB4-FU02 | PB4 | Not started | Define and test a safe local HTTP development cookie flow without weakening production: production session cookies must retain `Secure` and existing protections, and an insecure development setting must not silently apply in production. Document the development boundary and test both environments. |
-| PB2-PB4-FU01 | PB2/PB4 | In progress | Celery Beat is available. Schedule bounded, database-time cleanup of expired `auth_login_throttle` rows and test preservation of active limits under concurrent login. |
+| PB2-PB4-FU01 | PB2/PB4 | Done | Celery Beat schedules bounded, database-time cleanup with a service initiator; active limits and both login/cleanup lock orders are tested. See [DR-022](../adr/DR-022.md). The affected isolated suite passed 65 tests. |
 | P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
 
 **Next phase:** Finish PB2, open its PR and wait for the owner's review and

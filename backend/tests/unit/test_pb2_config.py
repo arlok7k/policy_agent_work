@@ -30,6 +30,9 @@ def pb2_env(tmp_path: Path) -> tuple[dict[str, str | Redacted], Redacted]:
             "THREAT_INTEL_BULK_MAX_ITEMS": "3",
             "INCIDENT_MAX_ALERTS": "3",
             "INCIDENT_MAX_TEXT_CHARS": "128",
+            "THROTTLE_CLEANUP_INTERVAL_SECONDS": "60",
+            "THROTTLE_CLEANUP_BATCH_SIZE": "3",
+            "THROTTLE_CLEANUP_INITIATOR": "service:test-throttle-cleanup",
             "CELERY_BROKER_URL": broker,
             "REDIS_CACHE_URL": cache,
         },
@@ -81,6 +84,8 @@ def test_webhook_signing_secret_must_be_in_a_readable_file(
         "THREAT_INTEL_BULK_MAX_ITEMS",
         "INCIDENT_MAX_ALERTS",
         "INCIDENT_MAX_TEXT_CHARS",
+        "THROTTLE_CLEANUP_INTERVAL_SECONDS",
+        "THROTTLE_CLEANUP_BATCH_SIZE",
     ],
 )
 def test_limits_are_required_positive_values(
@@ -107,5 +112,12 @@ def test_two_redis_instances_and_a_service_initiator_are_required(
         load_pb2_settings(reveal(values))
     values["REDIS_CACHE_URL"] = "redis://cache.invalid:6379/0"
     values["WEBHOOK_INITIATOR"] = "user:forged"
+    with pytest.raises(ConfigurationError):
+        load_pb2_settings(reveal(values))
+    values["WEBHOOK_INITIATOR"] = "service:example"
+    values["THROTTLE_CLEANUP_INITIATOR"] = "user:forged"
+    with pytest.raises(ConfigurationError):
+        load_pb2_settings(reveal(values))
+    del values["THROTTLE_CLEANUP_INITIATOR"]
     with pytest.raises(ConfigurationError):
         load_pb2_settings(reveal(values))
