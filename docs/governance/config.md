@@ -30,7 +30,13 @@ identical endpoints but cannot identify every possible DNS alias. Normal
 `redis://`/`rediss://` URLs are supported, as are `redis+socket:///...` for the
 broker and `unix:///...` for the cache. The application validates PB2 settings
 at startup but does not claim Redis readiness until a request actually uses it.
-The PB4 infrastructure has not yet been built.
+The PB4 infrastructure has not yet been built. Start a worker with the same
+required settings and restricted database login as the API:
+`PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery worker -Q default`.
+Broker access is a trust boundary: an initiator header is required, but is not
+itself authenticated against a compromised broker. Tasks use late
+acknowledgement and are redelivered on worker loss; other failures still require
+operator monitoring and are not reported as successful persistence.
 
 Webhook senders supply `X-Webhook-Timestamp` (Unix seconds), `X-Webhook-Id`
 (canonical lowercase UUID) and `X-Webhook-Signature` (`sha256=` plus the HMAC

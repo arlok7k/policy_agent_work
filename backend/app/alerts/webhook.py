@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import hmac
-import json
-import math
 import re
 import time
-from typing import Any, NoReturn
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from celery import Celery
 from fastapi import APIRouter, Request, Response, status
 from kombu.exceptions import KombuError
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 from redis import Redis
 from redis.exceptions import RedisError
 from starlette.concurrency import run_in_threadpool
 
 from app.alerts.schemas import WebhookAccepted, WebhookAlert
+from app.alerts.validation import validate_alert
 from app.core.exceptions import BadRequest, Conflict, PayloadTooLarge, Unauthenticated, Unavailable
 from app.core.logging import mark_principal
 from app.core.pb2_config import PB2Settings
@@ -73,59 +71,6 @@ def verify_webhook_signature(
     except ValueError, UnicodeError, OverflowError:
         raise Unauthenticated() from None
     return identifier
-
-
-def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate field")
-        result[key] = value
-    return result
-
-
-def _invalid_constant(value: str) -> NoReturn:
-    raise ValueError("invalid JSON number")
-
-
-def _finite_float(value: str) -> float:
-    result = float(value)
-    if not math.isfinite(result):
-        raise ValueError("invalid JSON number")
-    return result
-
-
-def _valid_json_text(value: Any) -> None:
-    if isinstance(value, str):
-        if "\x00" in value:
-            raise ValueError("invalid text")
-        value.encode("utf-8")
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            _valid_json_text(key)
-            _valid_json_text(item)
-    elif isinstance(value, list):
-        for item in value:
-            _valid_json_text(item)
-
-
-def validate_alert(body: bytes, *, max_field_chars: int) -> WebhookAlert:
-    """Reject ambiguous JSON and strings PostgreSQL cannot safely store."""
-    try:
-        decoded = json.loads(
-            body.decode("utf-8"),
-            object_pairs_hook=_unique_object,
-            parse_constant=_invalid_constant,
-            parse_float=_finite_float,
-        )
-        _valid_json_text(decoded)
-        payload = WebhookAlert.model_validate(decoded)
-        for value in (payload.source, payload.rule_id, payload.severity, payload.agent):
-            if value is not None and (not value.strip() or len(value) > max_field_chars):
-                raise ValueError("invalid alert text")
-        return payload
-    except ValueError, UnicodeError, ValidationError, RecursionError:
-        raise BadRequest() from None
 
 
 @router.post(

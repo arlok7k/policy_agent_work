@@ -10,9 +10,13 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Condition
 from uuid import UUID, uuid4
 
 import pytest
+from celery import Celery
+from celery.contrib.testing.worker import start_worker
+from celery.signals import task_postrun
 from kombu.exceptions import OperationalError
 from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -286,3 +290,84 @@ def test_ambiguous_publication_failure_keeps_reservation(
         webhook.client.post("/api/alerts/webhook", content=body, headers=headers).status_code == 409
     )
     assert _counts(webhook) == (0, 0, 1)
+
+
+def test_webhook_to_worker_to_database_deduplicates_and_preserves_data(
+    webhook: WebhookHarness,
+) -> None:
+    completed: list[tuple[str, object]] = []
+    condition = Condition()
+
+    def observed(
+        sender: object = None, state: str = "", retval: object = None, **_: object
+    ) -> None:
+        if getattr(sender, "name", None) == "app.jobs.normalize_alert":
+            with condition:
+                completed.append((state, retval))
+                condition.notify_all()
+
+    task_postrun.connect(observed, weak=False)
+    body = _body()
+    try:
+        with start_worker(
+            app.state.celery, pool="solo", perform_ping_check=False, loglevel="ERROR"
+        ):
+            for _ in range(2):
+                response = webhook.client.post(
+                    "/api/alerts/webhook", content=body, headers=_headers(webhook.signing, body)
+                )
+                assert response.status_code == 202
+            with condition:
+                assert condition.wait_for(lambda: len(completed) == 2, timeout=20)
+        assert [state for state, _ in completed] == ["SUCCESS", "SUCCESS"]
+        returned = [result for _, result in completed]
+        assert all(isinstance(result, dict) for result in returned)
+        assert {result["created"] for result in returned if isinstance(result, dict)} == {
+            True,
+            False,
+        }
+        assert len({result["id"] for result in returned if isinstance(result, dict)}) == 1
+        engine = create_engine(webhook.database_url, hide_parameters=True)
+        try:
+            with engine.connect() as db:
+                rows = db.execute(text("SELECT src_ip, agent, raw FROM alerts")).all()
+            assert len(rows) == 1 and str(rows[0].src_ip) == "2001:db8::1"
+            assert rows[0].agent is None
+            assert rows[0].raw["message"] == "<script>alert('plain data')</script>; ' OR 1=1 --"
+        finally:
+            engine.dispose()
+    finally:
+        task_postrun.disconnect(observed)
+
+
+def test_worker_rejects_a_broker_message_without_an_initiator(webhook: WebhookHarness) -> None:
+    completed: list[str] = []
+    condition = Condition()
+
+    def observed(sender: object = None, state: str = "", **_: object) -> None:
+        if getattr(sender, "name", None) == "app.jobs.normalize_alert":
+            with condition:
+                completed.append(state)
+                condition.notify_all()
+
+    task_postrun.connect(observed, weak=False)
+    publisher = Celery("untrusted-test-publisher", broker=os.environ["TEST_REDIS_BROKER_URL"])
+    try:
+        with start_worker(
+            app.state.celery, pool="solo", perform_ping_check=False, loglevel="ERROR"
+        ):
+            publisher.send_task(
+                "app.jobs.normalize_alert",
+                args=[json.loads(_body())],
+                queue="default",
+                retry=False,
+                argsrepr="<redacted>",
+                kwargsrepr="<redacted>",
+            )
+            with condition:
+                assert condition.wait_for(lambda: len(completed) == 1, timeout=20)
+        assert completed == ["FAILURE"]
+        assert _counts(webhook) == (0, 0, 0)
+    finally:
+        publisher.close()
+        task_postrun.disconnect(observed)
