@@ -295,6 +295,10 @@
             "title": "Requestable",
             "type": "boolean"
           },
+          "requires_unprotected_ip": {
+            "title": "Requires Unprotected Ip",
+            "type": "boolean"
+          },
           "reverse_action": {
             "anyOf": [
               {
@@ -328,6 +332,7 @@
           "requestable",
           "execution_modes",
           "ttl_required",
+          "requires_unprotected_ip",
           "reverse_action",
           "target_schema",
           "parameters_schema"

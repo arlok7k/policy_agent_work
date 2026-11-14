@@ -64,9 +64,34 @@ def upgrade() -> None:
           ('ipv4-rfc1918-192', 'network', '192.168.0.0/16'),
           ('ipv4-loopback', 'network', '127.0.0.0/8'),
           ('ipv4-link-local', 'network', '169.254.0.0/16'),
+          ('ipv4-unspecified', 'network', '0.0.0.0/32'),
+          ('ipv4-multicast', 'network', '224.0.0.0/4'),
+          ('ipv6-unspecified', 'network', '::/128'),
           ('ipv6-loopback', 'network', '::1/128'),
           ('ipv6-link-local', 'network', 'fe80::/10'),
+          ('ipv6-unique-local', 'network', 'fc00::/7'),
+          ('ipv6-multicast', 'network', 'ff00::/8'),
           ('shell-metacharacters', 'shell', 'baseline')
+        """
+    )
+    op.execute(
+        """
+        CREATE FUNCTION hpb_lock_safeguard_rules() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            PERFORM id FROM kill_switch_state WHERE id = 1 FOR UPDATE;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'kill switch state is missing' USING ERRCODE = '23514';
+            END IF;
+            RETURN NULL;
+        END;
+        $$
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER response_safeguard_serialization
+        BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON response_safeguard_rule
+        FOR EACH STATEMENT EXECUTE FUNCTION hpb_lock_safeguard_rules()
         """
     )
     op.execute("REVOKE ALL ON kill_switch_state, response_safeguard_rule FROM PUBLIC, hpb_app")
@@ -75,6 +100,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER response_safeguard_serialization ON response_safeguard_rule")
+    op.execute("DROP FUNCTION hpb_lock_safeguard_rules()")
     op.drop_table("response_safeguard_rule")
     op.execute("DROP TRIGGER kill_switch_no_delete ON kill_switch_state")
     op.execute("DROP FUNCTION hpb_protect_kill_switch_row()")

@@ -121,8 +121,13 @@ def test_response_schema_seed_facts_and_runtime_privileges(migrated_url: str) ->
                 ("network", "192.168.0.0/16"),
                 ("network", "127.0.0.0/8"),
                 ("network", "169.254.0.0/16"),
+                ("network", "0.0.0.0/32"),
+                ("network", "224.0.0.0/4"),
+                ("network", "::/128"),
                 ("network", "::1/128"),
                 ("network", "fe80::/10"),
+                ("network", "fc00::/7"),
+                ("network", "ff00::/8"),
                 ("shell", "baseline"),
             }
             for table, privileges in allowed.items():

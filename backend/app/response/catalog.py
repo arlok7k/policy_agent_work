@@ -40,6 +40,7 @@ class CatalogItem(BaseModel):
     requestable: bool
     execution_modes: list[Mode]
     ttl_required: bool
+    requires_unprotected_ip: bool
     reverse_action: str | None
     target_schema: dict[str, Any]
     parameters_schema: dict[str, Any]
@@ -59,6 +60,7 @@ class ActionDefinition:
     modes: tuple[Mode, ...]
     target_model: type[StrictPayload]
     parameters_model: type[StrictPayload]
+    requires_unprotected_ip: bool
     reverse_action: str | None = None
 
     def view(self) -> CatalogItem:
@@ -70,6 +72,7 @@ class ActionDefinition:
             requestable=self.requestable,
             execution_modes=list(self.modes),
             ttl_required=self.level == 2 and self.requestable,
+            requires_unprotected_ip=self.requires_unprotected_ip,
             reverse_action=self.reverse_action,
             target_schema=self.target_model.model_json_schema(),
             parameters_schema=self.parameters_model.model_json_schema(),
@@ -89,22 +92,38 @@ class ActionDefinition:
 
 _DEFINITIONS = (
     ActionDefinition(
-        "advisory", 0, "none", False, True, ("advisory",), ValueTarget, MessageParameters
+        "advisory", 0, "none", False, True, ("advisory",), ValueTarget, MessageParameters, False
     ),
     ActionDefinition(
-        "ioc_add", 1, "internal", False, True, ("automatic",), ValueTarget, EmptyParameters
+        "ioc_add", 1, "internal", False, True, ("automatic",), ValueTarget, EmptyParameters, False
     ),
     ActionDefinition(
-        "ioc_update", 1, "internal", False, True, ("automatic",), ValueTarget, EmptyParameters
+        "ioc_update",
+        1,
+        "internal",
+        False,
+        True,
+        ("automatic",),
+        ValueTarget,
+        EmptyParameters,
+        False,
     ),
     ActionDefinition(
-        "fp_mute", 1, "internal", False, True, ("automatic",), ValueTarget, EmptyParameters
+        "fp_mute", 1, "internal", False, True, ("automatic",), ValueTarget, EmptyParameters, False
     ),
     ActionDefinition(
-        "escalate", 1, "internal", False, True, ("automatic",), ValueTarget, MessageParameters
+        "escalate",
+        1,
+        "internal",
+        False,
+        True,
+        ("automatic",),
+        ValueTarget,
+        MessageParameters,
+        False,
     ),
     ActionDefinition(
-        "notify", 1, "internal", False, True, ("automatic",), ValueTarget, MessageParameters
+        "notify", 1, "internal", False, True, ("automatic",), ValueTarget, MessageParameters, False
     ),
     ActionDefinition(
         "firewall_drop",
@@ -115,6 +134,7 @@ _DEFINITIONS = (
         ("automatic", "manual"),
         FirewallTarget,
         EmptyParameters,
+        True,
         "firewall_allow",
     ),
     ActionDefinition(
@@ -126,10 +146,19 @@ _DEFINITIONS = (
         ("automatic", "manual"),
         FirewallTarget,
         EmptyParameters,
+        False,
         "firewall_drop",
     ),
     ActionDefinition(
-        "release_host", 2, "simulated_wazuh", False, False, (), FirewallTarget, EmptyParameters
+        "release_host",
+        2,
+        "simulated_wazuh",
+        False,
+        False,
+        (),
+        FirewallTarget,
+        EmptyParameters,
+        False,
     ),
     ActionDefinition(
         "isolate_host",
@@ -140,6 +169,7 @@ _DEFINITIONS = (
         ("manual",),
         FirewallTarget,
         EmptyParameters,
+        True,
         "release_host",
     ),
     ActionDefinition(
@@ -151,6 +181,7 @@ _DEFINITIONS = (
         ("manual",),
         FirewallTarget,
         EmptyParameters,
+        True,
     ),
 )
 CATALOG = MappingProxyType({item.name: item for item in _DEFINITIONS})

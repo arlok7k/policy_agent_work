@@ -13,7 +13,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | PB2-FIX01 | Done | Redis/publication 503 `Retry-After` follow-up; [DR-024](../adr/DR-024.md). The isolated affected suite passed 48 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T01 | Done | Migrations 006–008, immutable requests, decision/log constraints, singleton and runtime grants; [DR-025](../adr/DR-025.md). Full isolated `make check` passed 253 tests before a rollback-recovery refinement; its affected isolated suite then passed 31 tests. |
 | PB3-T02 | Done | Immutable action catalog, strict parameter/target schemas, role-protected route and OpenAPI; [DR-026](../adr/DR-026.md). The affected isolated suite passed 8 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T03 | Pending | Pure, fail-closed Safeguards. |
+| PB3-T03 | Done | Pure evaluator, additive rules and serialized safety snapshots; [DR-027](../adr/DR-027.md). The affected isolated suite passed 58 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T04 | Pending | Approval Gate and Four-Eyes state machine. |
 | PB3-T05 | Pending | Simulated connectors and socket-level no-network test. |
 | PB3-T06 | Pending | Celery execution and execution-time revalidation. |
@@ -32,6 +32,10 @@ format, mypy, OpenAPI drift, affected and full isolated tests passed.
 PB3-T02's first affected pytest collection found unit and integration files with
 the same basename. The new integration file was renamed without changing its
 tests; the repeat collected and passed all 8 affected tests.
+PB3-T03's first Ruff run interpreted a zero-address test fixture as a server
+binding, so the same address is now constructed with `IPv4Address(0)`. Mypy
+then identified unreachable defensive type checks against annotated fields;
+checking them as untrusted objects retained the guards. Repeat checks passed.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated

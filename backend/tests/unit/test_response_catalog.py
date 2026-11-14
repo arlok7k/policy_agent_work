@@ -48,6 +48,9 @@ def test_catalog_levels_modes_reversibility_and_schemas() -> None:
             item.reverse_action,
         ) == expected[item.action_type]
         assert item.ttl_required is (item.level == 2 and item.requestable)
+        assert item.requires_unprotected_ip is (
+            item.action_type in {"firewall_drop", "isolate_host", "permanent_block"}
+        )
         Draft202012Validator.check_schema(item.target_schema)
         Draft202012Validator.check_schema(item.parameters_schema)
         assert item.target_schema["additionalProperties"] is False
