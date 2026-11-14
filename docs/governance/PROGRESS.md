@@ -17,7 +17,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | PB3-T04 | Done | Transactional, audited approval state machine with live-role checks, self-approval denial and race protection; [DR-028](../adr/DR-028.md). The affected isolated suite passed 27 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T05 | Done | Simulation-only structured connectors and socket-level no-network test; [DR-029](../adr/DR-029.md). The affected isolated suite passed 61 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T06 | Done | Celery execution, live approval/safeguard/switch revalidation and bounded Beat recovery; [DR-030](../adr/DR-030.md). The affected isolated suite passed 44 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T07 | Pending | L2 TTL, Celery Beat rollback and boundary tests. |
+| PB3-T07 | Done | Configurable mandatory L2 TTL, bounded Beat rollback, switch/safeguard rechecks and frozen-clock boundary tests; [DR-031](../adr/DR-031.md). The affected isolated suite passed 32 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T08 | Pending | Audited automation-only Kill Switch and worker propagation. |
 | PB3-T09 | Pending | Response APIs and §3.4 legacy authorization. |
 | PB3-T10 | Pending | Characterization, security, OpenAPI and phase evidence. |
@@ -43,6 +43,8 @@ SQL literals; the imports were restored and strings split. The first isolated
 run exposed an autoflush that tried to update an append-only command timestamp;
 the timestamp is now set before insertion, retaining the append-only privilege.
 The repeated checks and final affected 44-test suite passed.
+PB3-T07's first Ruff run requested an unquoted return annotation; after the
+annotation was corrected, repeat static checks and the affected suite passed.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated

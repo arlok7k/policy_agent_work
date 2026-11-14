@@ -21,8 +21,10 @@ from app.jobs.celery_app import (
     EXECUTE_RESPONSE_TASK,
     NORMALIZE_ALERT_TASK,
     RECONCILE_RESPONSE_TASK,
+    TTL_SWEEP_TASK,
 )
 from app.response.execution import approved_for_reconciliation, execute_approved
+from app.response.ttl import due_for_rollback, rollback_expired
 
 
 @contextmanager
@@ -65,7 +67,7 @@ def register_tasks(celery: Celery, settings: PB2Settings, response: PB3Settings)
         identifier = UUID(action_id)
         policy = load_legacy_policy()
         with task_database() as (db, _):
-            result = execute_approved(db, identifier, policy)
+            result = execute_approved(db, identifier, policy, response)
         return {"result": result}
 
     @celery.task(name=RECONCILE_RESPONSE_TASK, shared=False)
@@ -78,9 +80,24 @@ def register_tasks(celery: Celery, settings: PB2Settings, response: PB3Settings)
         for identifier in identifiers:
             try:
                 with task_database() as (db, _):
-                    result = execute_approved(db, identifier, policy)
+                    result = execute_approved(db, identifier, policy, response)
                 counts[result] += 1
             except SQLAlchemyError:
                 # Keep other actions moving; a later bounded sweep retries this row.
+                counts["errors"] += 1
+        return counts
+
+    @celery.task(name=TTL_SWEEP_TASK, shared=False)
+    def rollback_expired_responses_task() -> dict[str, int]:
+        """Retry overdue L2 rollbacks in bounded, independent transactions."""
+        with task_database() as (db, _):
+            identifiers = due_for_rollback(db, response.response_sweep_batch_size)
+        counts = {"rolled_back": 0, "paused": 0, "refused": 0, "noop": 0, "errors": 0}
+        for identifier in identifiers:
+            try:
+                with task_database() as (db, _):
+                    result = rollback_expired(db, identifier)
+                counts[result] += 1
+            except SQLAlchemyError:
                 counts["errors"] += 1
         return counts

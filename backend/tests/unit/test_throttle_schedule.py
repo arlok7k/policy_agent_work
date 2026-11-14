@@ -8,6 +8,7 @@ from app.jobs.celery_app import (
     CLEANUP_SCHEDULE,
     CLEANUP_THROTTLE_TASK,
     RECONCILE_RESPONSE_SCHEDULE,
+    TTL_SWEEP_SCHEDULE,
     create_celery,
 )
 
@@ -17,7 +18,11 @@ def test_beat_schedule_is_bounded_configured_and_attributed() -> None:
     celery = create_celery(settings)
     try:
         scheduler = Scheduler(app=celery)
-        assert set(scheduler.schedule) == {CLEANUP_SCHEDULE, RECONCILE_RESPONSE_SCHEDULE}
+        assert set(scheduler.schedule) == {
+            CLEANUP_SCHEDULE,
+            RECONCILE_RESPONSE_SCHEDULE,
+            TTL_SWEEP_SCHEDULE,
+        }
         entry = scheduler.schedule[CLEANUP_SCHEDULE]
         assert entry.task == CLEANUP_THROTTLE_TASK
         assert entry.options["headers"]["initiator"] == settings.throttle_cleanup_initiator

@@ -18,6 +18,9 @@ EXECUTE_RESPONSE_TASK = "app.jobs.execute_response"
 RECONCILE_RESPONSE_TASK = "app.jobs.reconcile_responses"
 RECONCILE_RESPONSE_SCHEDULE = "reconcile-approved-responses"
 RECONCILE_INITIATOR = "service:response-reconcile"
+TTL_SWEEP_TASK = "app.jobs.rollback_expired_responses"
+TTL_SWEEP_SCHEDULE = "rollback-expired-responses"
+TTL_INITIATOR = "service:response-ttl"
 
 
 def require_initiator(headers: object) -> str:
@@ -89,6 +92,16 @@ def create_celery(settings: PB2Settings, response: PB3Settings | None = None) ->
                 "options": {
                     "queue": "default",
                     "headers": {"initiator": RECONCILE_INITIATOR},
+                    "argsrepr": "<redacted>",
+                    "kwargsrepr": "<redacted>",
+                },
+            },
+            TTL_SWEEP_SCHEDULE: {
+                "task": TTL_SWEEP_TASK,
+                "schedule": response.response_sweep_interval_seconds,
+                "options": {
+                    "queue": "default",
+                    "headers": {"initiator": TTL_INITIATOR},
                     "argsrepr": "<redacted>",
                     "kwargsrepr": "<redacted>",
                 },

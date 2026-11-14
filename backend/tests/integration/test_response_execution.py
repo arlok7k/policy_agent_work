@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.legacy_policy import load_legacy_policy
+from app.core.pb3_config import load_pb3_settings
 from app.jobs.celery_app import (
     EXECUTE_RESPONSE_TASK,
     RECONCILE_RESPONSE_SCHEDULE,
@@ -95,7 +96,7 @@ def _seed(
 
 def _execute(runtime: Engine, identifier: UUID) -> str:
     with Session(runtime) as db, db.begin():
-        return execute_approved(db, identifier, load_legacy_policy())
+        return execute_approved(db, identifier, load_legacy_policy(), load_pb3_settings())
 
 
 def _state(owner: Engine, identifier: UUID) -> tuple[str, int]:
@@ -216,6 +217,31 @@ def test_new_safeguard_and_approver_demotion_fail_closed_and_terminally(
         runtime.dispose()
 
 
+def test_worker_rechecks_l2_ttl_against_current_configured_maximum(
+    migrated_url: str, runtime_url: str, pb2_accounts: dict[str, PB2Account]
+) -> None:
+    owner = create_engine(migrated_url, hide_parameters=True)
+    runtime = create_engine(runtime_url, hide_parameters=True)
+    try:
+        action = _seed(
+            owner,
+            pb2_accounts["analyst"].id,
+            action_type="firewall_drop",
+            level=2,
+            mode="automatic",
+            ttl=120,
+        )
+        shorter = load_pb3_settings(
+            {"RESPONSE_L2_TTL_DEFAULT_SECONDS": "30", "RESPONSE_L2_TTL_MAX_SECONDS": "60"}
+        )
+        with Session(runtime) as db, db.begin():
+            assert execute_approved(db, action, load_legacy_policy(), shorter) == "failed"
+        assert _state(owner, action) == ("failed", 0)
+    finally:
+        owner.dispose()
+        runtime.dispose()
+
+
 def test_pending_or_deactivated_requester_cannot_be_executed_and_policy_fails_closed(
     migrated_url: str, runtime_url: str, pb2_accounts: dict[str, PB2Account]
 ) -> None:
@@ -234,7 +260,7 @@ def test_pending_or_deactivated_requester_cannot_be_executed_and_policy_fails_cl
         )
         assert _execute(runtime, pending) == "noop"
         with Session(runtime) as db, db.begin(), pytest.raises(RuntimeError):
-            execute_approved(db, automatic, {})
+            execute_approved(db, automatic, {}, load_pb3_settings())
         assert _state(owner, automatic) == ("approved", 0)
         with owner.begin() as db:
             db.execute(text("UPDATE users SET is_active=false WHERE id=:id"), {"id": requester})

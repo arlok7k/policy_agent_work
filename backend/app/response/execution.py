@@ -8,10 +8,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.connectors.base import Connector, ConnectorRefused
-from app.connectors.internal import InternalConnector
-from app.connectors.simulated_wazuh import SimulatedWazuhConnector
+from app.connectors.base import ConnectorRefused
+from app.connectors.registry import CONNECTORS
 from app.core.activity import append_activity
+from app.core.pb3_config import PB3Settings
 from app.response.catalog import CATALOG
 from app.response.gate import transition
 from app.response.models import ResponseAction, ResponseApproval
@@ -22,10 +22,6 @@ from app.users.models import Role, User
 ExecutionResult = Literal["executed", "paused", "failed", "noop"]
 _ALLOWED_REQUESTERS = frozenset({"analyst", "senior_analyst", "admin"})
 _ALLOWED_APPROVERS = frozenset({"senior_analyst", "admin"})
-_CONNECTORS: Mapping[str, Connector] = {
-    "internal": InternalConnector(),
-    "simulated_wazuh": SimulatedWazuhConnector(),
-}
 
 
 def _policy_roles(policy: Mapping[str, tuple[str, ...]], key: str) -> frozenset[str]:
@@ -50,7 +46,7 @@ def _refuse(db: Session, action: ResponseAction, username: str, reason: str) -> 
 
 
 def execute_approved(
-    db: Session, action_id: UUID, policy: Mapping[str, tuple[str, ...]]
+    db: Session, action_id: UUID, policy: Mapping[str, tuple[str, ...]], response: PB3Settings
 ) -> ExecutionResult:
     """Execute once, within the caller's open transaction; never invoke from HTTP.
 
@@ -125,8 +121,14 @@ def execute_approved(
         or not definition.requestable
         or definition.level != action.level
         or action.approval_mode not in definition.modes
-        or definition.connector not in _CONNECTORS
-        or (action.level == 2 and (action.ttl_seconds is None or action.ttl_seconds <= 0))
+        or definition.connector not in CONNECTORS
+        or (
+            action.level == 2
+            and (
+                action.ttl_seconds is None
+                or not 1 <= action.ttl_seconds <= response.l2_ttl_max_seconds
+            )
+        )
     ):
         return _refuse(db, action, username, "invalid_action")
     result = check_safeguards(
@@ -137,7 +139,7 @@ def execute_approved(
     if automated and safety.kill_switch_engaged:
         return "paused"
     transition(db, action, "executing", username=username, ip=None)
-    connector = _CONNECTORS[definition.connector]
+    connector = CONNECTORS[definition.connector]
     try:
         command = connector.execute(
             db,
