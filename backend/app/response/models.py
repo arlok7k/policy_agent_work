@@ -4,7 +4,18 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, SmallInteger, Text, Uuid, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Integer,
+    SmallInteger,
+    Text,
+    Uuid,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,5 +69,24 @@ class ResponseApproval(Base):
     decision: Mapped[str] = mapped_column(Text)
     reason: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class ExecutedCommand(Base):
+    __tablename__ = "executed_commands"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    action_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("response_actions.id", ondelete="RESTRICT")
+    )
+    phase: Mapped[str] = mapped_column(Text)
+    connector: Mapped[str] = mapped_column(Text)
+    command: Mapped[str] = mapped_column(Text)
+    target: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    initiator: Mapped[str] = mapped_column(Text)
+    simulated: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    executed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

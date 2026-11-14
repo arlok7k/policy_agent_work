@@ -15,7 +15,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | PB3-T02 | Done | Immutable action catalog, strict parameter/target schemas, role-protected route and OpenAPI; [DR-026](../adr/DR-026.md). The affected isolated suite passed 8 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T03 | Done | Pure evaluator, additive rules and serialized safety snapshots; [DR-027](../adr/DR-027.md). The affected isolated suite passed 58 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T04 | Done | Transactional, audited approval state machine with live-role checks, self-approval denial and race protection; [DR-028](../adr/DR-028.md). The affected isolated suite passed 27 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T05 | Pending | Simulated connectors and socket-level no-network test. |
+| PB3-T05 | Done | Simulation-only structured connectors and socket-level no-network test; [DR-029](../adr/DR-029.md). The affected isolated suite passed 61 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T06 | Pending | Celery execution and execution-time revalidation. |
 | PB3-T07 | Pending | L2 TTL, Celery Beat rollback and boundary tests. |
 | PB3-T08 | Pending | Audited automation-only Kill Switch and worker propagation. |
@@ -36,6 +36,8 @@ PB3-T03's first Ruff run interpreted a zero-address test fixture as a server
 binding, so the same address is now constructed with `IPv4Address(0)`. Mypy
 then identified unreachable defensive type checks against annotated fields;
 checking them as untrusted objects retained the guards. Repeat checks passed.
+PB3-T05's first mypy run flagged an optional reverse-action lookup assignment;
+checking the lookup before assignment fixed the type, and repeat checks passed.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated
