@@ -5,8 +5,6 @@ from uuid import UUID
 
 from celery import Celery
 from fastapi import APIRouter, Depends, Query, Request, Response, status
-from kombu.exceptions import KombuError
-from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -54,7 +52,9 @@ def _dispatch(celery: Celery, name: str, args: list[str], actor: UUID) -> None:
             argsrepr="<redacted>",
             kwargsrepr="<redacted>",
         )
-    except KombuError, RedisError, OSError:
+    except Exception:
+        # The durable transaction already committed; reporting failure here
+        # would invite duplicate requests. Do not log broker exception details.
         logger.warning('{"component":"response_dispatch","outcome":"deferred"}')
 
 

@@ -160,10 +160,11 @@ def test_idempotency_replays_conflicts_concurrency_and_user_scope(pb2_api: PB2AP
     assert_not_disclosed("Idempotent replay", second.text, key)
     assert _create(pb2_api, headers, {**body, "target": {"value": "different"}}).status_code == 409
     assert _create(pb2_api, {**senior, "Idempotency-Key": key}, body).status_code == 201
-    assert (
-        _create(pb2_api, {**analyst, "Idempotency-Key": Redacted("bad key")}, body).status_code
-        == 400
-    )
+    for invalid in ("bad key", "-bad", "_bad"):
+        assert (
+            _create(pb2_api, {**analyst, "Idempotency-Key": Redacted(invalid)}, body).status_code
+            == 400
+        )
     race_key = Redacted(f"race-{uuid4().hex}")
     race_headers = {**analyst, "Idempotency-Key": race_key}
     barrier = threading.Barrier(2)
@@ -379,6 +380,31 @@ def test_refused_manual_rollback_requires_fresh_request_and_can_recover(
                 db.execute(text("DELETE FROM response_safeguard_rule WHERE code='new-protection'"))
         with Session(runtime) as db, db.begin():
             assert perform_manual_rollback(db, action, actor, stamp, load_legacy_policy()) == "noop"
+        with owner.connect() as db:
+            reasons = (
+                db.execute(
+                    text(
+                        "SELECT details->>'reason' FROM case_activities "
+                        "WHERE action='response.manual_rollback_refused' AND target=:target"
+                    ),
+                    {"target": f"response_action:{action}"},
+                )
+                .scalars()
+                .all()
+            )
+            assert reasons == [
+                "ineligible_operator" if changed == "role" else "safeguard_or_invalid_action"
+            ]
+            assert (
+                db.execute(
+                    text(
+                        "SELECT count(*) FROM executed_commands "
+                        "WHERE action_id=:id AND phase='rollback'"
+                    ),
+                    {"id": action},
+                ).scalar_one()
+                == 0
+            )
         client.cookies.clear()
         assert (
             client.post(

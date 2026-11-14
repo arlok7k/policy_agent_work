@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from celery import Celery
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,7 @@ from app.jobs.celery_app import (
 )
 from app.response.execution import approved_for_reconciliation, execute_approved
 from app.response.manual_rollback import pending_manual_rollbacks, perform_manual_rollback
+from app.response.models import ResponseAction
 from app.response.ttl import due_for_rollback, rollback_expired
 
 
@@ -87,9 +89,23 @@ def register_tasks(celery: Celery, settings: PB2Settings, response: PB3Settings)
     def reconcile_response_task() -> dict[str, int]:
         """Recover approved work after loss, pausing automation without starving humans."""
         policy = load_legacy_policy()
+        batch_size = response.response_sweep_batch_size
         with task_database() as (db, _):
-            identifiers = approved_for_reconciliation(db, response.response_sweep_batch_size)
-            rollbacks = pending_manual_rollbacks(db, response.response_sweep_batch_size)
+            identifiers = approved_for_reconciliation(db, batch_size)
+            rollbacks = pending_manual_rollbacks(db, batch_size)
+            approvals = db.execute(
+                select(ResponseAction.id, ResponseAction.created_at).where(
+                    ResponseAction.id.in_(identifiers)
+                )
+            ).all()
+        # Bound the *combined* work, rather than allowing one full batch for
+        # each kind. Ordering the two bounded candidate sets together prevents
+        # either a stream of approvals or rollback requests from always winning.
+        candidates: list[tuple[datetime, UUID, UUID | None]] = [
+            (created, identifier, None) for identifier, created in approvals
+        ]
+        candidates.extend((at, identifier, actor) for identifier, actor, at in rollbacks)
+        candidates.sort(key=lambda candidate: (candidate[0], candidate[1]))
         counts = {
             "executed": 0,
             "paused": 0,
@@ -100,20 +116,19 @@ def register_tasks(celery: Celery, settings: PB2Settings, response: PB3Settings)
             "manual_refused": 0,
             "manual_noop": 0,
         }
-        for identifier in identifiers:
+        for at, identifier, actor in candidates[:batch_size]:
             try:
+                outcome: str
                 with task_database() as (db, _):
-                    result = execute_approved(db, identifier, policy, response)
-                counts[result] += 1
+                    if actor is None:
+                        outcome = execute_approved(db, identifier, policy, response)
+                    else:
+                        outcome = (
+                            f"manual_{perform_manual_rollback(db, identifier, actor, at, policy)}"
+                        )
+                counts[outcome] += 1
             except SQLAlchemyError:
                 # Keep other actions moving; a later bounded sweep retries this row.
-                counts["errors"] += 1
-        for identifier, actor, at in rollbacks:
-            try:
-                with task_database() as (db, _):
-                    manual_result = perform_manual_rollback(db, identifier, actor, at, policy)
-                counts[f"manual_{manual_result}"] += 1
-            except SQLAlchemyError:
                 counts["errors"] += 1
         return counts
 

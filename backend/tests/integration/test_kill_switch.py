@@ -2,6 +2,7 @@
 
 import json
 import threading
+from time import monotonic
 from uuid import UUID
 
 import pytest
@@ -185,10 +186,15 @@ def test_switch_propagates_to_already_running_worker_and_queued_automation(pb2_a
                     retry=False,
                 )
                 assert _post(pb2_api, admin, {"engaged": True}).status_code == 200
+                engaged_at = monotonic()
                 release.set()
                 with condition:
                     assert condition.wait_for(lambda: len(events) >= 1, timeout=20)
+                propagation_seconds = monotonic() - engaged_at
                 assert events[0] == (EXECUTE_RESPONSE_TASK, "SUCCESS", {"result": "paused"})
+                # This is an observed target in an uncongested test worker, not
+                # a guarantee under database, broker or worker contention.
+                assert propagation_seconds <= 1.5
                 assert _action_state(owner, automatic) == ("approved", 0)
                 app.state.celery.send_task(
                     EXECUTE_RESPONSE_TASK,

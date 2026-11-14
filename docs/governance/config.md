@@ -26,7 +26,10 @@ starting. Configuration failures do not print supplied values.
 | `THREAT_INTEL_TIMEOUT_SECONDS` | Yes | Positive provider deadline; example 2. |
 | `THREAT_INTEL_CACHE_TTL_SECONDS` | Yes | Positive cache lifetime; example 3600. |
 | `THREAT_INTEL_BULK_MAX_ITEMS` | Yes | Positive maximum indicators per request; example 100. |
-| `INCIDENT_MAX_ALERTS`, `INCIDENT_MAX_TEXT_CHARS` | Yes | Positive incident alert-count and text bounds; examples 100 and 4096. |
+| `INCIDENT_MAX_ALERTS`, `INCIDENT_MAX_TEXT_CHARS` | Yes | Positive incident alert-count and text bounds; examples 100 and 4096. The text limit also applies to response target/parameter strings and approval reasons. |
+| `RESPONSE_SWEEP_INTERVAL_SECONDS` | No | Response recovery and TTL sweep cadence, 1–3600 seconds; default 5. |
+| `RESPONSE_SWEEP_BATCH_SIZE` | No | Maximum actions processed per response recovery or TTL sweep, 1–1000; default 100. Recovery's limit covers approved actions and manual rollbacks combined. |
+| `RESPONSE_L2_TTL_DEFAULT_SECONDS`, `RESPONSE_L2_TTL_MAX_SECONDS` | No | Positive L2 TTL default and maximum, both at most 86400 seconds; defaults are 3600 and 86400. The default cannot exceed the configured maximum. |
 | `THROTTLE_CLEANUP_INTERVAL_SECONDS`, `THROTTLE_CLEANUP_BATCH_SIZE` | Yes | Positive scheduler interval and maximum rows per cleanup; examples 300 and 500. |
 | `THROTTLE_CLEANUP_INITIATOR` | Yes | Stable `service:<name>` identity attached to scheduled cleanup tasks. |
 | `CELERY_BROKER_URL` / `CELERY_BROKER_URL_FILE` | Exactly one | Redis broker URL; treated as a secret because it may contain credentials. |
@@ -57,6 +60,16 @@ itself authenticated against a compromised broker. Tasks use late
 acknowledgement and are redelivered on worker loss; other failures still require
 operator monitoring and are not reported as successful persistence.
 
+Response actions are durable in PostgreSQL before best-effort task publication.
+Keep Beat, the broker and workers running so the bounded recovery and TTL sweeps
+can retry outstanding work. All API and worker replicas must share the same
+response settings. The Kill Switch pauses automation and TTL sweeps, not
+human-approved execution or authorized manual rollback. Unsafe TTL reversals
+remain executed for a later retry; a refused manual rollback requires a fresh
+authorized request. Connectors only record simulated commands; they do not
+contact Wazuh or perform real containment. See [DR-030](../adr/DR-030.md),
+[DR-031](../adr/DR-031.md) and [DR-033](../adr/DR-033.md).
+
 Webhook senders supply `X-Webhook-Timestamp` (Unix seconds), `X-Webhook-Id`
 (canonical lowercase UUID) and `X-Webhook-Signature` (`sha256=` plus the HMAC
 hex digest). The signed bytes are the timestamp, a dot, the UUID, a dot, then
@@ -72,7 +85,11 @@ or log secret values. Test secrets are generated at runtime and discarded.
 Alembic reads only `DATABASE_URL` or `DATABASE_URL_FILE`; it does not require the
 session-signing secret. Run upgrades with `make migrate PYTHON=<venv-python>` after
 provisioning the database URL. Never run a downgrade against a non-disposable
-database.
+database. The supported PB3 upgrade starts at the released PB2 revision 005.
+An older, unmerged development copy of revisions 006–008 may lack columns in
+the final 006 and cannot be distinguished by Alembic's revision number. Do not
+use such a persistent database with the final PB3 code without a separately
+reviewed migration plan; see [DR-033](../adr/DR-033.md).
 
 Database tests require `TEST_DATABASE_URL` to point to a genuinely disposable
 PostgreSQL database named with an `_test` suffix, plus

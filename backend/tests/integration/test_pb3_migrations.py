@@ -404,10 +404,25 @@ def test_pb3_migrations_leave_the_pb1_pb2_schema_unchanged(migrated_url: str) ->
     engine = create_engine(migrated_url, hide_parameters=True)
     try:
         command.downgrade(Config("alembic.ini"), "005_ioc_cache")
+        incident = _incident(engine)
         before = _baseline_schema(engine)
         command.upgrade(Config("alembic.ini"), "head")
         after = _baseline_schema(engine)
         assert after == before
+        assert {"idempotency_key_digest", "idempotency_request_digest"} <= {
+            column["name"] for column in inspect(engine).get_columns("response_actions")
+        }
+        with engine.connect() as db:
+            assert (
+                db.execute(
+                    text("SELECT title FROM incidents WHERE id=:id"), {"id": incident}
+                ).scalar_one()
+                == "response case"
+            )
+            assert (
+                db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+                == "008_response_safety"
+            )
     finally:
         engine.dispose()
 
