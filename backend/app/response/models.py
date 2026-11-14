@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Identity,
     Integer,
+    LargeBinary,
     SmallInteger,
     Text,
     Uuid,
@@ -39,6 +40,8 @@ class ResponseAction(Base):
     decided_by: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT")
     )
+    idempotency_key_digest: Mapped[bytes | None] = mapped_column(LargeBinary(32))
+    idempotency_request_digest: Mapped[bytes | None] = mapped_column(LargeBinary(32))
     ttl_seconds: Mapped[int | None] = mapped_column(Integer)
     ttl_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     rollback_of_id: Mapped[UUID | None] = mapped_column(

@@ -39,6 +39,8 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("decided_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="RESTRICT")),
+        sa.Column("idempotency_key_digest", sa.LargeBinary(length=32)),
+        sa.Column("idempotency_request_digest", sa.LargeBinary(length=32)),
         sa.Column("ttl_seconds", sa.Integer()),
         sa.Column("ttl_expires_at", postgresql.TIMESTAMP(timezone=True)),
         sa.Column(
@@ -61,6 +63,13 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.CheckConstraint("action_type <> ''", name="ck_response_actions_action_type"),
+        sa.CheckConstraint(
+            "(idempotency_key_digest IS NULL AND idempotency_request_digest IS NULL) OR "
+            "(idempotency_key_digest IS NOT NULL AND idempotency_request_digest IS NOT NULL AND "
+            "octet_length(idempotency_key_digest) = 32 AND "
+            "octet_length(idempotency_request_digest) = 32)",
+            name="ck_response_actions_idempotency",
+        ),
         sa.CheckConstraint("jsonb_typeof(target) = 'object'", name="ck_response_actions_target"),
         sa.CheckConstraint("jsonb_typeof(params) = 'object'", name="ck_response_actions_params"),
         sa.CheckConstraint("level BETWEEN 0 AND 3", name="ck_response_actions_level"),
@@ -111,6 +120,13 @@ def upgrade() -> None:
     )
     op.create_index("ix_response_actions_created_id", "response_actions", ["created_at", "id"])
     op.create_index(
+        "uq_response_actions_idempotency",
+        "response_actions",
+        ["requested_by", "idempotency_key_digest"],
+        unique=True,
+        postgresql_where=sa.text("idempotency_key_digest IS NOT NULL"),
+    )
+    op.create_index(
         "ix_response_actions_incident", "response_actions", ["incident_id", "created_at"]
     )
     op.create_index(
@@ -138,11 +154,13 @@ def upgrade() -> None:
                 RETURN NEW;
             END IF;
             IF ROW(NEW.id, NEW.incident_id, NEW.action_type, NEW.target, NEW.params, NEW.level,
-                   NEW.approval_mode, NEW.requested_by, NEW.ttl_seconds, NEW.rollback_of_id,
+                   NEW.approval_mode, NEW.requested_by, NEW.idempotency_key_digest,
+                   NEW.idempotency_request_digest, NEW.ttl_seconds, NEW.rollback_of_id,
                    NEW.created_at)
                IS DISTINCT FROM
                ROW(OLD.id, OLD.incident_id, OLD.action_type, OLD.target, OLD.params, OLD.level,
-                   OLD.approval_mode, OLD.requested_by, OLD.ttl_seconds, OLD.rollback_of_id,
+                   OLD.approval_mode, OLD.requested_by, OLD.idempotency_key_digest,
+                   OLD.idempotency_request_digest, OLD.ttl_seconds, OLD.rollback_of_id,
                    OLD.created_at) THEN
                 RAISE EXCEPTION 'response action request is immutable' USING ERRCODE = '23514';
             END IF;

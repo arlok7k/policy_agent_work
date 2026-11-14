@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -19,11 +20,13 @@ from app.core.pb3_config import PB3Settings
 from app.jobs.celery_app import (
     CLEANUP_THROTTLE_TASK,
     EXECUTE_RESPONSE_TASK,
+    MANUAL_ROLLBACK_TASK,
     NORMALIZE_ALERT_TASK,
     RECONCILE_RESPONSE_TASK,
     TTL_SWEEP_TASK,
 )
 from app.response.execution import approved_for_reconciliation, execute_approved
+from app.response.manual_rollback import pending_manual_rollbacks, perform_manual_rollback
 from app.response.ttl import due_for_rollback, rollback_expired
 
 
@@ -70,13 +73,33 @@ def register_tasks(celery: Celery, settings: PB2Settings, response: PB3Settings)
             result = execute_approved(db, identifier, policy, response)
         return {"result": result}
 
+    @celery.task(name=MANUAL_ROLLBACK_TASK, shared=False)
+    def manual_rollback_response_task(
+        action_id: str, actor_id: str, requested_at: str
+    ) -> dict[str, str]:
+        """Execute only the still-current, revalidated human rollback intent."""
+        action, actor, at = UUID(action_id), UUID(actor_id), datetime.fromisoformat(requested_at)
+        with task_database() as (db, _):
+            result = perform_manual_rollback(db, action, actor, at, load_legacy_policy())
+        return {"result": result}
+
     @celery.task(name=RECONCILE_RESPONSE_TASK, shared=False)
     def reconcile_response_task() -> dict[str, int]:
         """Recover approved work after loss, pausing automation without starving humans."""
         policy = load_legacy_policy()
         with task_database() as (db, _):
             identifiers = approved_for_reconciliation(db, response.response_sweep_batch_size)
-        counts = {"executed": 0, "paused": 0, "failed": 0, "noop": 0, "errors": 0}
+            rollbacks = pending_manual_rollbacks(db, response.response_sweep_batch_size)
+        counts = {
+            "executed": 0,
+            "paused": 0,
+            "failed": 0,
+            "noop": 0,
+            "errors": 0,
+            "manual_rolled_back": 0,
+            "manual_refused": 0,
+            "manual_noop": 0,
+        }
         for identifier in identifiers:
             try:
                 with task_database() as (db, _):
@@ -84,6 +107,13 @@ def register_tasks(celery: Celery, settings: PB2Settings, response: PB3Settings)
                 counts[result] += 1
             except SQLAlchemyError:
                 # Keep other actions moving; a later bounded sweep retries this row.
+                counts["errors"] += 1
+        for identifier, actor, at in rollbacks:
+            try:
+                with task_database() as (db, _):
+                    manual_result = perform_manual_rollback(db, identifier, actor, at, policy)
+                counts[f"manual_{manual_result}"] += 1
+            except SQLAlchemyError:
                 counts["errors"] += 1
         return counts
 

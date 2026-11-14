@@ -116,6 +116,8 @@ def decide_action(
     safe_reason = _decision_reason(reason, maximum_reason_chars)
     with db.begin():
         actor, _ = lock_authorized_actor(db, settings, session_token, identity, allowed_roles)
+        if actor.role not in {"senior_analyst", "admin"}:
+            raise Forbidden()
         action = db.execute(
             select(ResponseAction).where(ResponseAction.id == action_id).with_for_update()
         ).scalar_one_or_none()

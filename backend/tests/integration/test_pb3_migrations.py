@@ -57,6 +57,8 @@ def test_response_schema_seed_facts_and_runtime_privileges(migrated_url: str) ->
                 "status",
                 "requested_by",
                 "decided_by",
+                "idempotency_key_digest",
+                "idempotency_request_digest",
                 "ttl_seconds",
                 "ttl_expires_at",
                 "rollback_of_id",
@@ -99,6 +101,9 @@ def test_response_schema_seed_facts_and_runtime_privileges(migrated_url: str) ->
             item["column_names"] == ["action_id", "phase"]
             for item in inspector.get_unique_constraints("executed_commands")
         )
+        assert "uq_response_actions_idempotency" in {
+            index["name"] for index in inspector.get_indexes("response_actions") if index["unique"]
+        }
         assert "ix_response_actions_ttl_due" in {
             index["name"] for index in inspector.get_indexes("response_actions")
         }
@@ -460,6 +465,51 @@ def test_new_rollback_actor_can_replace_a_lost_or_revoked_request(
                     "rollback_requested_at=clock_timestamp() WHERE id=:id"
                 ),
                 {"actor": pb2_accounts["admin"].id, "id": action},
+            )
+    finally:
+        engine.dispose()
+
+
+def test_idempotency_digests_are_paired_scoped_unique_and_immutable(
+    migrated_url: str, pb2_accounts: dict[str, PB2Account]
+) -> None:
+    import hashlib
+
+    engine = create_engine(migrated_url, hide_parameters=True)
+    try:
+        incident = _incident(engine)
+        requester = pb2_accounts["analyst"].id
+        other = pb2_accounts["senior"].id
+        key_hash = hashlib.sha256(b"schema-key-fixture").digest()
+        request_hash = hashlib.sha256(b"schema-request-fixture").digest()
+        insert = text(
+            "INSERT INTO response_actions "
+            "(incident_id, action_type, target, params, level, approval_mode, requested_by, "
+            "idempotency_key_digest, idempotency_request_digest) "
+            "VALUES (:incident, 'ioc_add', '{\"value\":\"x\"}'::jsonb, '{}'::jsonb, "
+            "1, 'automatic', :requester, :key, :request) RETURNING id"
+        )
+        values = {
+            "incident": incident,
+            "requester": requester,
+            "key": key_hash,
+            "request": request_hash,
+        }
+        with engine.begin() as db:
+            first = db.execute(insert, values).scalar_one()
+            db.execute(insert, {**values, "requester": other})
+        with pytest.raises(IntegrityError), engine.begin() as db:
+            db.execute(insert, values)
+        with pytest.raises(IntegrityError), engine.begin() as db:
+            db.execute(insert, {**values, "key": None})
+        with pytest.raises(IntegrityError), engine.begin() as db:
+            db.execute(insert, {**values, "key": b"short", "requester": other})
+        with pytest.raises(DBAPIError), engine.begin() as db:
+            db.execute(
+                text(
+                    "UPDATE response_actions SET idempotency_request_digest=:request WHERE id=:id"
+                ),
+                {"request": key_hash, "id": first},
             )
     finally:
         engine.dispose()

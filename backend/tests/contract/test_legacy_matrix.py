@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 
 from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 from app.main import app
@@ -36,6 +37,17 @@ ROLE_ROUTES = (
     RouteCase("GET", "/api/incidents/{incident_id}", "all", 200),
     RouteCase("GET", "/api/incidents/{incident_id}/evidence", "all", 200),
     RouteCase("GET", "/api/response/catalog", "all", 200),
+    RouteCase("GET", "/api/response/actions", "all", 200),
+    RouteCase("POST", "/api/response/actions", "all", 201, "response_create"),
+    RouteCase(
+        "POST", "/api/response/actions/{action_id}/approve", "senior", 200, "response_decision"
+    ),
+    RouteCase(
+        "POST", "/api/response/actions/{action_id}/reject", "senior", 200, "response_decision"
+    ),
+    RouteCase(
+        "POST", "/api/response/actions/{action_id}/rollback", "senior", 202, "response_rollback"
+    ),
     RouteCase("POST", "/api/response/kill-switch", "senior", 200, "switch"),
     RouteCase("POST", "/api/threat-intel/check-ip", "all", 200, "ip"),
     RouteCase("POST", "/api/threat-intel/bulk-check", "all", 200, "ips"),
@@ -89,6 +101,14 @@ def _send(client: object, case: RouteCase, values: dict[str, object], headers: d
     bodies = {
         "investigate": {},
         "switch": {"engaged": True},
+        "response_create": {
+            "incident_id": str(values["incident_id"]),
+            "action_type": "ioc_add",
+            "target": {"value": "matrix"},
+            "params": {},
+        },
+        "response_decision": {},
+        "response_rollback": {},
         "incident": {"title": "matrix incident", "alert_ids": []},
         "ip": {"indicator": "127.0.0.1"},
         "ips": {"indicators": ["127.0.0.1"]},
@@ -108,6 +128,50 @@ def _send(client: object, case: RouteCase, values: dict[str, object], headers: d
         kwargs["json"] = bodies[case.body]
     client.cookies.clear()
     return client.request(case.method, path, **kwargs)
+
+
+def _matrix_action(
+    engine: Engine, incident_id: object, requester: object, approver: object, *, executed: bool
+) -> object:
+    with engine.begin() as db:
+        action = db.execute(
+            text(
+                "INSERT INTO response_actions "
+                "(incident_id, action_type, target, params, level, approval_mode, requested_by) "
+                "VALUES (:incident, 'isolate_host', "
+                "CAST(:target AS jsonb), '{}'::jsonb, 3, 'manual', :requester) RETURNING id"
+            ),
+            {
+                "incident": incident_id,
+                "target": json.dumps({"agent_id": "004", "ip": "8.8.8.8"}),
+                "requester": requester,
+            },
+        ).scalar_one()
+        db.execute(
+            text("UPDATE response_actions SET status='pending_approval' WHERE id=:id"),
+            {"id": action},
+        )
+        if executed:
+            db.execute(
+                text(
+                    "INSERT INTO response_approvals (action_id, approver_id, decision) "
+                    "VALUES (:id, :approver, 'approved')"
+                ),
+                {"id": action, "approver": approver},
+            )
+            db.execute(
+                text(
+                    "UPDATE response_actions SET status='approved', "
+                    "decided_by=:approver WHERE id=:id"
+                ),
+                {"id": action, "approver": approver},
+            )
+            for status in ("executing", "executed"):
+                db.execute(
+                    text("UPDATE response_actions SET status=:status WHERE id=:id"),
+                    {"status": status, "id": action},
+                )
+        return action
 
 
 def _signed_webhook(signing: Redacted) -> tuple[bytes, dict[str, str | Redacted]]:
@@ -191,6 +255,7 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
         values = {
             "alert_id": alert_id,
             "incident_id": incident_id,
+            "action_id": uuid4(),
             "key_id": delete_id,
             "user_id": pb2_api.accounts["analyst"].id,
             "new_password": Redacted.random(),
@@ -209,6 +274,14 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
         for case in ROLE_ROUTES:
             for principal, authentic in credentials.items():
                 headers = {**authentic, "X-Role": "admin"}
+                if case.body in {"response_decision", "response_rollback"}:
+                    values["action_id"] = _matrix_action(
+                        engine,
+                        incident_id,
+                        pb2_api.accounts["analyst"].id,
+                        pb2_api.accounts["senior"].id,
+                        executed=case.body == "response_rollback",
+                    )
                 response = _send(client, case, values, headers)
                 if principal in {"anonymous", "inactive"}:
                     expected = 401

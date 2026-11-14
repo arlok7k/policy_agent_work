@@ -19,7 +19,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | PB3-T06 | Done | Celery execution, live approval/safeguard/switch revalidation and bounded Beat recovery; [DR-030](../adr/DR-030.md). The affected isolated suite passed 44 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T07 | Done | Configurable mandatory L2 TTL, bounded Beat rollback, switch/safeguard rechecks and frozen-clock boundary tests; [DR-031](../adr/DR-031.md). The affected isolated suite passed 32 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T08 | Done | Audited, senior/admin automation-only Kill Switch with real running-worker propagation; [DR-032](../adr/DR-032.md). The affected isolated suite passed 26 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T09 | Pending | Response APIs and §3.4 legacy authorization. |
+| PB3-T09 | Done | Response action/decision/rollback/list APIs, optional idempotency and durable manual rollback recovery; [DR-033](../adr/DR-033.md). The affected isolated suite passed 47 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T10 | Pending | Characterization, security, OpenAPI and phase evidence. |
 
 PB2-FIX01's initial pre-commit invocation used the system Python without the
@@ -45,6 +45,8 @@ the timestamp is now set before insertion, retaining the append-only privilege.
 The repeated checks and final affected 44-test suite passed.
 PB3-T07's first Ruff run requested an unquoted return annotation; after the
 annotation was corrected, repeat static checks and the affected suite passed.
+PB3-T09's first mypy run found a variable reused for two distinct result types;
+the manual result now has its own name, and repeat checks passed.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated
