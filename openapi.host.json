@@ -844,6 +844,45 @@
         "title": "KeyView",
         "type": "object"
       },
+      "KillSwitchChange": {
+        "additionalProperties": false,
+        "properties": {
+          "engaged": {
+            "title": "Engaged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "engaged"
+        ],
+        "title": "KillSwitchChange",
+        "type": "object"
+      },
+      "KillSwitchView": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "changed_by": {
+            "format": "uuid",
+            "title": "Changed By",
+            "type": "string"
+          },
+          "engaged": {
+            "title": "Engaged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "engaged",
+          "changed_by",
+          "changed_at"
+        ],
+        "title": "KillSwitchView",
+        "type": "object"
+      },
       "LoginRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3534,6 +3573,100 @@
         "x-legacy-operation": "response_read",
         "x-legacy-roles": [
           "analyst",
+          "senior_analyst",
+          "admin"
+        ]
+      }
+    },
+    "/api/response/kill-switch": {
+      "post": {
+        "description": "Engage or disengage automation, auditing every authorized request. Human-approved execution remains possible; queued automation and TTL jobs pause.",
+        "operationId": "kill_switch_api_response_kill_switch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KillSwitchChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "CSRFCookie": [],
+            "CSRFHeader": [],
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Kill Switch",
+        "tags": [
+          "response"
+        ],
+        "x-legacy-operation": "response_kill_switch",
+        "x-legacy-roles": [
           "senior_analyst",
           "admin"
         ]

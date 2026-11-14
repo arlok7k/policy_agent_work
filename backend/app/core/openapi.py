@@ -20,6 +20,7 @@ _ROLE_OPERATIONS: dict[tuple[str, str], str] = {
     ("get", "/api/incidents/{incident_id}"): "incidents_read",
     ("get", "/api/incidents/{incident_id}/evidence"): "incidents_read",
     ("get", "/api/response/catalog"): "response_read",
+    ("post", "/api/response/kill-switch"): "response_kill_switch",
     ("post", "/api/threat-intel/check-ip"): "threat_intel",
     ("post", "/api/threat-intel/bulk-check"): "threat_intel",
     ("get", "/api/threat-intel/cache/stats"): "threat_intel",
@@ -50,6 +51,7 @@ _ERRORS: dict[tuple[str, str], tuple[int, ...]] = {
     ("get", "/api/incidents/{incident_id}"): (*_COMMON, 404),
     ("get", "/api/incidents/{incident_id}/evidence"): (*_COMMON, 404, 422),
     ("get", "/api/response/catalog"): (401, 403, 500, 503),
+    ("post", "/api/response/kill-switch"): _COMMON,
     ("post", "/api/threat-intel/check-ip"): _COMMON,
     ("post", "/api/threat-intel/bulk-check"): (*_COMMON, 422),
     ("get", "/api/threat-intel/cache/stats"): (401, 403, 500, 503),
@@ -95,6 +97,10 @@ _DESCRIPTIONS: dict[tuple[str, str], str] = {
     ),
     ("post", "/api/threat-intel/bulk-check"): (
         "Only deterministic mock results are available; THREAT_INTEL_BULK_MAX_ITEMS bounds input."
+    ),
+    ("post", "/api/response/kill-switch"): (
+        "Engage or disengage automation, auditing every authorized request. "
+        "Human-approved execution remains possible; queued automation and TTL jobs pause."
     ),
     ("get", "/api/response/catalog"): (
         "Action levels, strict target/parameter schemas and simulated connector behavior. "

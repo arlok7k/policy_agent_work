@@ -31,7 +31,11 @@ def test_export_is_reproducible_valid_and_matches_authentication_boundaries() ->
     assert "HTTPValidationError" not in schemas
     for case in ROLE_ROUTES:
         operation = document["paths"][case.path][case.method.lower()]
-        expected = {"admin"} if case.access == "admin" else {"analyst", "senior_analyst", "admin"}
+        expected = {
+            "admin": {"admin"},
+            "senior": {"senior_analyst", "admin"},
+            "all": {"analyst", "senior_analyst", "admin"},
+        }[case.access]
         assert set(operation["x-legacy-roles"]) == expected
         if case.method == "GET":
             assert operation["security"] == [{"SessionCookie": []}]

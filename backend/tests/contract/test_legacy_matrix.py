@@ -36,6 +36,7 @@ ROLE_ROUTES = (
     RouteCase("GET", "/api/incidents/{incident_id}", "all", 200),
     RouteCase("GET", "/api/incidents/{incident_id}/evidence", "all", 200),
     RouteCase("GET", "/api/response/catalog", "all", 200),
+    RouteCase("POST", "/api/response/kill-switch", "senior", 200, "switch"),
     RouteCase("POST", "/api/threat-intel/check-ip", "all", 200, "ip"),
     RouteCase("POST", "/api/threat-intel/bulk-check", "all", 200, "ips"),
     RouteCase("GET", "/api/threat-intel/cache/stats", "all", 200),
@@ -87,6 +88,7 @@ def _send(client: object, case: RouteCase, values: dict[str, object], headers: d
     path = case.path.format(**values)
     bodies = {
         "investigate": {},
+        "switch": {"engaged": True},
         "incident": {"title": "matrix incident", "alert_ids": []},
         "ip": {"indicator": "127.0.0.1"},
         "ips": {"indicators": ["127.0.0.1"]},
@@ -213,6 +215,8 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
                 elif principal in {"outsider", "service"}:
                     expected = 403
                 elif case.access == "admin" and principal != "admin":
+                    expected = 403
+                elif case.access == "senior" and principal not in {"senior", "admin"}:
                     expected = 403
                 else:
                     expected = case.success

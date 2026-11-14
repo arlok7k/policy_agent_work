@@ -22,6 +22,7 @@ def test_missing_operation_rules_fail_closed(
         ("incidents_write", "POST", "/api/incidents", {"title": "not persisted"}),
         ("investigate", "POST", f"/api/alerts/{uuid4()}/investigate", {}),
         ("response_read", "GET", "/api/response/catalog", None),
+        ("response_kill_switch", "POST", "/api/response/kill-switch", {"engaged": True}),
     )
     original = dict(app.state.legacy_policy)
     for operation, method, path, body in cases:

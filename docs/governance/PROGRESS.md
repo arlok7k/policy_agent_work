@@ -18,7 +18,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | PB3-T05 | Done | Simulation-only structured connectors and socket-level no-network test; [DR-029](../adr/DR-029.md). The affected isolated suite passed 61 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T06 | Done | Celery execution, live approval/safeguard/switch revalidation and bounded Beat recovery; [DR-030](../adr/DR-030.md). The affected isolated suite passed 44 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T07 | Done | Configurable mandatory L2 TTL, bounded Beat rollback, switch/safeguard rechecks and frozen-clock boundary tests; [DR-031](../adr/DR-031.md). The affected isolated suite passed 32 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T08 | Pending | Audited automation-only Kill Switch and worker propagation. |
+| PB3-T08 | Done | Audited, senior/admin automation-only Kill Switch with real running-worker propagation; [DR-032](../adr/DR-032.md). The affected isolated suite passed 26 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T09 | Pending | Response APIs and §3.4 legacy authorization. |
 | PB3-T10 | Pending | Characterization, security, OpenAPI and phase evidence. |
 
