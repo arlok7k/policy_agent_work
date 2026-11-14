@@ -1,4 +1,4 @@
-"""Accurate, versioned PB1/PB2 host OpenAPI security and error contracts."""
+"""Accurate, versioned host OpenAPI security and error contracts."""
 
 from http import HTTPStatus
 from typing import Any
@@ -19,6 +19,7 @@ _ROLE_OPERATIONS: dict[tuple[str, str], str] = {
     ("post", "/api/incidents"): "incidents_write",
     ("get", "/api/incidents/{incident_id}"): "incidents_read",
     ("get", "/api/incidents/{incident_id}/evidence"): "incidents_read",
+    ("get", "/api/response/catalog"): "response_read",
     ("post", "/api/threat-intel/check-ip"): "threat_intel",
     ("post", "/api/threat-intel/bulk-check"): "threat_intel",
     ("get", "/api/threat-intel/cache/stats"): "threat_intel",
@@ -48,6 +49,7 @@ _ERRORS: dict[tuple[str, str], tuple[int, ...]] = {
     ("post", "/api/incidents"): (*_COMMON, 404, 422),
     ("get", "/api/incidents/{incident_id}"): (*_COMMON, 404),
     ("get", "/api/incidents/{incident_id}/evidence"): (*_COMMON, 404, 422),
+    ("get", "/api/response/catalog"): (401, 403, 500, 503),
     ("post", "/api/threat-intel/check-ip"): _COMMON,
     ("post", "/api/threat-intel/bulk-check"): (*_COMMON, 422),
     ("get", "/api/threat-intel/cache/stats"): (401, 403, 500, 503),
@@ -93,6 +95,10 @@ _DESCRIPTIONS: dict[tuple[str, str], str] = {
     ),
     ("post", "/api/threat-intel/bulk-check"): (
         "Only deterministic mock results are available; THREAT_INTEL_BULK_MAX_ITEMS bounds input."
+    ),
+    ("get", "/api/response/catalog"): (
+        "Action levels, strict target/parameter schemas and simulated connector behavior. "
+        "Release host is a rollback-only operation; independently requested L2 actions need TTL."
     ),
 }
 

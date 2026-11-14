@@ -35,6 +35,7 @@ ROLE_ROUTES = (
     RouteCase("POST", "/api/incidents", "all", 201, "incident"),
     RouteCase("GET", "/api/incidents/{incident_id}", "all", 200),
     RouteCase("GET", "/api/incidents/{incident_id}/evidence", "all", 200),
+    RouteCase("GET", "/api/response/catalog", "all", 200),
     RouteCase("POST", "/api/threat-intel/check-ip", "all", 200, "ip"),
     RouteCase("POST", "/api/threat-intel/bulk-check", "all", 200, "ips"),
     RouteCase("GET", "/api/threat-intel/cache/stats", "all", 200),

@@ -249,6 +249,108 @@
         "title": "CacheStats",
         "type": "object"
       },
+      "CatalogItem": {
+        "properties": {
+          "action_type": {
+            "title": "Action Type",
+            "type": "string"
+          },
+          "connector": {
+            "enum": [
+              "none",
+              "internal",
+              "simulated_wazuh"
+            ],
+            "title": "Connector",
+            "type": "string"
+          },
+          "execution_modes": {
+            "items": {
+              "enum": [
+                "advisory",
+                "automatic",
+                "manual"
+              ],
+              "type": "string"
+            },
+            "title": "Execution Modes",
+            "type": "array"
+          },
+          "level": {
+            "enum": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "title": "Level",
+            "type": "integer"
+          },
+          "parameters_schema": {
+            "additionalProperties": true,
+            "title": "Parameters Schema",
+            "type": "object"
+          },
+          "requestable": {
+            "title": "Requestable",
+            "type": "boolean"
+          },
+          "reverse_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverse Action"
+          },
+          "reversible": {
+            "title": "Reversible",
+            "type": "boolean"
+          },
+          "target_schema": {
+            "additionalProperties": true,
+            "title": "Target Schema",
+            "type": "object"
+          },
+          "ttl_required": {
+            "title": "Ttl Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action_type",
+          "level",
+          "connector",
+          "reversible",
+          "requestable",
+          "execution_modes",
+          "ttl_required",
+          "reverse_action",
+          "target_schema",
+          "parameters_schema"
+        ],
+        "title": "CatalogItem",
+        "type": "object"
+      },
+      "CatalogPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CatalogPage",
+        "type": "object"
+      },
       "CheckIPRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3352,6 +3454,79 @@
           "incidents"
         ],
         "x-legacy-operation": "incidents_read",
+        "x-legacy-roles": [
+          "analyst",
+          "senior_analyst",
+          "admin"
+        ]
+      }
+    },
+    "/api/response/catalog": {
+      "get": {
+        "description": "Action levels, strict target/parameter schemas and simulated connector behavior. Release host is a rollback-only operation; independently requested L2 actions need TTL.",
+        "operationId": "catalog_api_response_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Catalog",
+        "tags": [
+          "response"
+        ],
+        "x-legacy-operation": "response_read",
         "x-legacy-roles": [
           "analyst",
           "senior_analyst",
