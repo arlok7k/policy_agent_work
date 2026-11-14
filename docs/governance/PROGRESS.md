@@ -14,7 +14,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | PB3-T01 | Done | Migrations 006–008, immutable requests, decision/log constraints, singleton and runtime grants; [DR-025](../adr/DR-025.md). Full isolated `make check` passed 253 tests before a rollback-recovery refinement; its affected isolated suite then passed 31 tests. |
 | PB3-T02 | Done | Immutable action catalog, strict parameter/target schemas, role-protected route and OpenAPI; [DR-026](../adr/DR-026.md). The affected isolated suite passed 8 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T03 | Done | Pure evaluator, additive rules and serialized safety snapshots; [DR-027](../adr/DR-027.md). The affected isolated suite passed 58 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T04 | Pending | Approval Gate and Four-Eyes state machine. |
+| PB3-T04 | Done | Transactional, audited approval state machine with live-role checks, self-approval denial and race protection; [DR-028](../adr/DR-028.md). The affected isolated suite passed 27 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
 | PB3-T05 | Pending | Simulated connectors and socket-level no-network test. |
 | PB3-T06 | Pending | Celery execution and execution-time revalidation. |
 | PB3-T07 | Pending | L2 TTL, Celery Beat rollback and boundary tests. |

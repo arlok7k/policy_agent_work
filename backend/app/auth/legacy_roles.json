@@ -7,5 +7,9 @@
   "incidents_read": ["analyst", "senior_analyst", "admin"],
   "incidents_write": ["analyst", "senior_analyst", "admin"],
   "investigate": ["analyst", "senior_analyst", "admin"],
-  "response_read": ["analyst", "senior_analyst", "admin"]
+  "response_read": ["analyst", "senior_analyst", "admin"],
+  "response_request": ["analyst", "senior_analyst", "admin"],
+  "response_decide": ["senior_analyst", "admin"],
+  "response_rollback": ["senior_analyst", "admin"],
+  "response_kill_switch": ["senior_analyst", "admin"]
 }
