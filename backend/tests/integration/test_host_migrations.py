@@ -25,13 +25,18 @@ def test_schema_and_seeded_roles(migrated_url: str) -> None:
             "api_keys",
             "auth_login_throttle",
             "case_activities",
+            "alerts",
+            "incidents",
+            "incident_alerts",
+            "evidence",
+            "ioc_cache",
         }
         with engine.connect() as connection:
             roles = set(connection.execute(text("SELECT name FROM roles")).scalars())
             assert roles == {"admin", "senior_analyst", "analyst"}
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == ("003_case_activities")
+            ).scalar_one() == ("005_ioc_cache")
         session_columns = {
             column["name"] for column in inspect(engine).get_columns("auth_sessions")
         }

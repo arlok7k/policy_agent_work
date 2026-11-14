@@ -1,6 +1,26 @@
 # Implementation progress
 
-Current phase: **PB1 — backend skeleton, database core, authentication**
+Current phase: **PB2 — alerts, incidents, evidence, threat-intel and AI adapters**
+
+PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
+baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated
+namespace: 131 tests, Ruff and mypy. `make audit` and pre-commit also passed.
+
+## PB2 task list
+
+| Task | Status | Notes |
+|---|---|---|
+| PB2-T01 | Done | Migrations 004–005, constraints, runtime grants and stepwise up/down on disposable PostgreSQL; [DR-015](../adr/DR-015.md). The affected suite passed 17 tests; full isolated `make check` passed 136 tests. |
+| PB2-T02 | In progress | HMAC webhook, bounded input, replay protection and enqueue. |
+| PB2-T03 | Not started | Celery worker, initiator headers, normalization and deduplication. |
+| PB2-T04 | Not started | Alert reads, filtering, cursor pagination and summary. |
+| PB2-T05 | Not started | Mock-only threat intelligence, dual cache and endpoint contracts. |
+| PB2-T06 | Not started | Deterministic mock AI provider and endpoints. |
+| PB2-T07 | Not started | Incidents, evidence, investigations and activity audit. |
+| PB2-T08 | Not started | Full legacy authorization characterization matrix. |
+| PB2-T09 | Not started | Host OpenAPI export, schema/status contracts and isolated CI. |
+
+## PB1 completed tasks
 
 | Task | Status | Notes |
 |---|---|---|
@@ -147,5 +167,5 @@ Security-boundary choices must follow the specification's owner-decision process
 | PB2-PB4-FU01 | PB2/PB4 | Not started | Schedule cleanup of expired `auth_login_throttle` rows when the relevant scheduler/infrastructure exists. Use database time and a reviewed bounded policy; test that cleanup does not reset active limits or race concurrent login attempts. |
 | P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
 
-**Next phase:** PB2 remains blocked until PB1 is complete and merged into `main`;
-this request explicitly stops before PB2.
+**Next phase:** Finish PB2, open its PR and wait for the owner's review and
+merge. Do not start PB3 in this request.
