@@ -1,4 +1,5 @@
 {
   "users": ["admin"],
-  "api_keys": ["admin"]
+  "api_keys": ["admin"],
+  "alerts_read": ["analyst", "senior_analyst", "admin"]
 }

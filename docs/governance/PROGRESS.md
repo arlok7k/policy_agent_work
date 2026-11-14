@@ -13,8 +13,8 @@ namespace: 131 tests, Ruff and mypy. `make audit` and pre-commit also passed.
 | PB2-T01 | Done | Migrations 004–005, constraints, runtime grants and stepwise up/down on disposable PostgreSQL; [DR-015](../adr/DR-015.md). The affected suite passed 17 tests; full isolated `make check` passed 136 tests. |
 | PB2-T02 | Done | File-only HMAC secret, streaming cap, schema validation, Redis replay reservations and Celery publication; [DR-016](../adr/DR-016.md). The affected suite passed 22 tests; full isolated `make check` passed 158 tests. |
 | PB2-T03 | Done | JSON-only Celery worker, mandatory initiator headers, canonical normalization and atomic fingerprint deduplication; [DR-016](../adr/DR-016.md). Affected suite: 23 passed, including a real Redis worker; full isolated `make check`: 166 passed. |
-| PB2-T04 | Not started | Alert reads, filtering, cursor pagination and summary. |
-| PB2-T05 | Not started | Mock-only threat intelligence, dual cache and endpoint contracts. |
+| PB2-T04 | Done | Role-protected alert list/detail/summary, filters and stable keyset cursors; [DR-017](../adr/DR-017.md). The affected isolated suite passed 26 tests. |
+| PB2-T05 | In progress | Mock-only threat intelligence, dual cache and endpoint contracts. |
 | PB2-T06 | Not started | Deterministic mock AI provider and endpoints. |
 | PB2-T07 | Not started | Incidents, evidence, investigations and activity audit. |
 | PB2-T08 | Not started | Full legacy authorization characterization matrix. |
@@ -28,6 +28,8 @@ PB2-T03's first mypy run identified missing generic type arguments for the
 Celery stubs; these were added, and the subsequent checks passed. The initial
 focused run emitted a Celery startup-retry deprecation warning; explicit startup
 configuration removed it, and the full run above passed without warnings.
+PB2-T04's first lint run found four overlong SQL literals in test fixtures; the
+strings were split without changing SQL, and the repeat lint and tests passed.
 
 ## PB1 completed tasks
 
