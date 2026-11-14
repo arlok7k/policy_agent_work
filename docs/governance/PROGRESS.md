@@ -1,6 +1,30 @@
 # Implementation progress
 
-Current phase: **PB2 — alerts, incidents, evidence, threat-intel and AI adapters**
+Current phase: **PB3 — response domain** (PB4 is out of scope)
+
+PB2 was merged into `main` at `e11c1f0`. Before PB3 and its requested webhook
+follow-up, the CI-equivalent isolated baseline passed **235 tests**, Ruff,
+formatting, mypy and OpenAPI drift checking against disposable services.
+
+## PB3 task list
+
+| Task | Status | Notes |
+|---|---|---|
+| PB2-FIX01 | Done | Redis/publication 503 `Retry-After` follow-up; [DR-024](../adr/DR-024.md). The isolated affected suite passed 48 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T01 | Pending | Migrations 006–008 and runtime privileges. |
+| PB3-T02 | Pending | Action catalog, levels and parameter schemas. |
+| PB3-T03 | Pending | Pure, fail-closed Safeguards. |
+| PB3-T04 | Pending | Approval Gate and Four-Eyes state machine. |
+| PB3-T05 | Pending | Simulated connectors and socket-level no-network test. |
+| PB3-T06 | Pending | Celery execution and execution-time revalidation. |
+| PB3-T07 | Pending | L2 TTL, Celery Beat rollback and boundary tests. |
+| PB3-T08 | Pending | Audited automation-only Kill Switch and worker propagation. |
+| PB3-T09 | Pending | Response APIs and §3.4 legacy authorization. |
+| PB3-T10 | Pending | Characterization, security, OpenAPI and phase evidence. |
+
+PB2-FIX01's initial pre-commit invocation used the system Python without the
+locked tools on `PATH` and failed to import Ruff/mypy. With `.venv/bin` first
+on `PATH`, all pre-commit hooks passed; the staged secret scan had no findings.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated

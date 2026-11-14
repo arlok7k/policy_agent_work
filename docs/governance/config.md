@@ -21,6 +21,7 @@ starting. Configuration failures do not print supplied values.
 | `WEBHOOK_INITIATOR` | Yes | Stable service identity, formatted `service:<name>`, attached to alert task headers. |
 | `WEBHOOK_MAX_BODY_BYTES`, `WEBHOOK_MAX_FIELD_CHARS` | Yes | Positive webhook byte and text-field caps; examples 262144 and 512. |
 | `WEBHOOK_MAX_CLOCK_SKEW_SECONDS` | Yes | Positive symmetric timestamp tolerance; example 300. |
+| `WEBHOOK_RETRY_AFTER_SECONDS` | No | Positive `Retry-After` hint on webhook replay-store or publication failure; default 30. It does not guarantee recovery. |
 | `REDIS_TIMEOUT_SECONDS` | Yes | Positive Redis connection and operation timeout; example 2. |
 | `THREAT_INTEL_TIMEOUT_SECONDS` | Yes | Positive provider deadline; example 2. |
 | `THREAT_INTEL_CACHE_TTL_SECONDS` | Yes | Positive cache lifetime; example 3600. |

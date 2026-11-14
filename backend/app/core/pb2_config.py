@@ -20,6 +20,8 @@ from pydantic import (
 
 from app.core.config import ConfigurationError, _read_secret
 
+DEFAULT_WEBHOOK_RETRY_AFTER_SECONDS = 30
+
 
 class PB2Settings(BaseModel):
     """Validate the webhook boundary and two distinct Redis instances."""
@@ -31,6 +33,7 @@ class PB2Settings(BaseModel):
     webhook_max_body_bytes: PositiveInt
     webhook_max_field_chars: PositiveInt
     webhook_max_clock_skew_seconds: PositiveInt
+    webhook_retry_after_seconds: PositiveInt = DEFAULT_WEBHOOK_RETRY_AFTER_SECONDS
     redis_timeout_seconds: PositiveInt
     threat_intel_timeout_seconds: PositiveFloat
     threat_intel_cache_ttl_seconds: PositiveInt
@@ -90,6 +93,9 @@ def load_pb2_settings(environ: Mapping[str, str] | None = None) -> PB2Settings:
                 "webhook_max_body_bytes": source.get("WEBHOOK_MAX_BODY_BYTES"),
                 "webhook_max_field_chars": source.get("WEBHOOK_MAX_FIELD_CHARS"),
                 "webhook_max_clock_skew_seconds": source.get("WEBHOOK_MAX_CLOCK_SKEW_SECONDS"),
+                "webhook_retry_after_seconds": source.get(
+                    "WEBHOOK_RETRY_AFTER_SECONDS", str(DEFAULT_WEBHOOK_RETRY_AFTER_SECONDS)
+                ),
                 "redis_timeout_seconds": source.get("REDIS_TIMEOUT_SECONDS"),
                 "threat_intel_timeout_seconds": source.get("THREAT_INTEL_TIMEOUT_SECONDS"),
                 "threat_intel_cache_ttl_seconds": source.get("THREAT_INTEL_CACHE_TTL_SECONDS"),

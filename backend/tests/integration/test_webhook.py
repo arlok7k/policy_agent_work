@@ -269,7 +269,29 @@ def test_cache_failure_fails_closed_before_publication(
             "/api/alerts/webhook", content=body, headers=_headers(webhook.signing, body)
         )
     assert response.status_code == 503
+    assert response.headers["Retry-After"] == "30"
+    assert response.headers["Cache-Control"] == "no-store"
     assert _counts(webhook) == (0, 0, 0)
+
+
+def test_unreachable_redis_uses_configured_retry_hint(
+    webhook: WebhookHarness, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    body = _body()
+    unreachable: Redis[bytes] = Redis.from_url(f"unix://{tmp_path / 'missing.sock'}?db=15")
+    settings = app.state.pb2_settings.model_copy(update={"webhook_retry_after_seconds": 47})
+    try:
+        with monkeypatch.context() as patch:
+            patch.setitem(app.state._state, "redis_cache", unreachable)
+            patch.setitem(app.state._state, "pb2_settings", settings)
+            response = webhook.client.post(
+                "/api/alerts/webhook", content=body, headers=_headers(webhook.signing, body)
+            )
+        assert response.status_code == 503
+        assert response.headers["Retry-After"] == "47"
+        assert _counts(webhook) == (0, 0, 0)
+    finally:
+        unreachable.close()
 
 
 def test_ambiguous_publication_failure_keeps_reservation(
@@ -285,6 +307,7 @@ def test_ambiguous_publication_failure_keeps_reservation(
         patch.setattr(app.state.celery, "send_task", fail)
         response = webhook.client.post("/api/alerts/webhook", content=body, headers=headers)
     assert response.status_code == 503
+    assert response.headers["Retry-After"] == "30"
     assert _counts(webhook) == (0, 0, 1)
     assert (
         webhook.client.post("/api/alerts/webhook", content=body, headers=headers).status_code == 409

@@ -44,3 +44,10 @@ class Throttled(HostError):
 
 class Unavailable(HostError):
     http_status = 503
+
+    def __init__(self, *, retry_after: int | None = None) -> None:
+        super().__init__()
+        if retry_after is not None:
+            if retry_after < 1:
+                raise ValueError("Retry delay must be positive")
+            self.headers = {"Retry-After": str(retry_after)}

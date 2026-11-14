@@ -175,6 +175,14 @@ class HostFastAPI(FastAPI):
                             }
                         },
                     }
+                    if key == ("post", "/api/alerts/webhook") and code == 503:
+                        responses[str(code)]["headers"] = {
+                            "Retry-After": {
+                                "description": "Configured retry hint in seconds; not a guarantee.",
+                                "required": True,
+                                "schema": {"type": "integer", "minimum": 1},
+                            }
+                        }
                 operation["security"] = _security(method, path)
                 if key in _ROLE_OPERATIONS:
                     name = _ROLE_OPERATIONS[key]

@@ -44,6 +44,10 @@ async def _http_problem(request: Request, error: Exception) -> JSONResponse:
     if not isinstance(error, StarletteHTTPException):
         return problem_response(request, 500)
     headers: dict[str, str] = {}
+    if error.status_code == 503 and error.headers:
+        retry_after = error.headers.get("Retry-After", "")
+        if retry_after.isascii() and retry_after.isdecimal():
+            headers["Retry-After"] = retry_after
     if error.status_code == 405 and error.headers:
         allowed = error.headers.get("Allow", "")
         methods = {item.strip() for item in allowed.split(",")}
