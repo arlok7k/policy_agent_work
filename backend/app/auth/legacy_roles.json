@@ -3,5 +3,8 @@
   "api_keys": ["admin"],
   "alerts_read": ["analyst", "senior_analyst", "admin"],
   "threat_intel": ["analyst", "senior_analyst", "admin"],
-  "ai": ["analyst", "senior_analyst", "admin"]
+  "ai": ["analyst", "senior_analyst", "admin"],
+  "incidents_read": ["analyst", "senior_analyst", "admin"],
+  "incidents_write": ["analyst", "senior_analyst", "admin"],
+  "investigate": ["analyst", "senior_analyst", "admin"]
 }

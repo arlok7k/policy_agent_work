@@ -25,6 +25,7 @@ from app.core.errors import install_error_handling
 from app.core.health import router as health_router
 from app.core.pb2_config import load_pb2_settings
 from app.core.security import PasswordService
+from app.incidents.router import router as incidents_router
 from app.jobs.celery_app import create_celery
 from app.threat_intel.providers import MockProvider
 from app.threat_intel.router import router as threat_intel_router
@@ -75,3 +76,4 @@ app.include_router(webhook_router)
 app.include_router(alerts_router)
 app.include_router(threat_intel_router)
 app.include_router(ai_router)
+app.include_router(incidents_router)

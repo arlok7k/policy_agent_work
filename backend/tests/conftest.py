@@ -31,6 +31,8 @@ def pb2_test_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         "THREAT_INTEL_TIMEOUT_SECONDS": "0.1",
         "THREAT_INTEL_CACHE_TTL_SECONDS": "60",
         "THREAT_INTEL_BULK_MAX_ITEMS": "3",
+        "INCIDENT_MAX_ALERTS": "3",
+        "INCIDENT_MAX_TEXT_CHARS": "128",
         "CELERY_BROKER_URL": "redis://127.0.0.1:1/0",
         "REDIS_CACHE_URL": "redis://127.0.0.1:2/0",
     }

@@ -16,8 +16,8 @@ namespace: 131 tests, Ruff and mypy. `make audit` and pre-commit also passed.
 | PB2-T04 | Done | Role-protected alert list/detail/summary, filters and stable keyset cursors; [DR-017](../adr/DR-017.md). The affected isolated suite passed 26 tests. |
 | PB2-T05 | Done | Deterministic mock-only IP verdicts, deadline degradation, DB-authoritative Redis cache, bounded bulk and stats; [DR-018](../adr/DR-018.md). The affected isolated suite passed 31 tests. |
 | PB2-T06 | Done | Three deterministic `mock=true` AI routes with minimized alert context and no governance data; [DR-019](../adr/DR-019.md). The affected isolated suite passed 18 tests. |
-| PB2-T07 | In progress | Incidents, evidence, investigations and activity audit. |
-| PB2-T08 | Not started | Full legacy authorization characterization matrix. |
+| PB2-T07 | Done | Bounded incident creation, scoped evidence and transactional investigation/audit with both mock adapters; [DR-020](../adr/DR-020.md). The affected isolated suite passed 46 tests. |
+| PB2-T08 | In progress | Full legacy authorization characterization matrix. |
 | PB2-T09 | Not started | Host OpenAPI export, schema/status contracts and isolated CI. |
 
 PB2-T02's first lint run found an unused import, and its first mypy run found a
@@ -35,6 +35,10 @@ run also flagged two unvalidated database-to-schema argument types. The SQL was
 split, the DB row is now validated as data, and the repeat checks passed.
 PB2-T06's first lint run requested Python's modern generic-function syntax;
 the helper was updated and the repeat lint and type checks passed.
+PB2-T07 had two consecutive Ruff E501 failures on three unchanged long SQL
+literals; the owner selected **“Fix and continue”** when asked whether to split
+those literals and continue. They were split without changing SQL or tests, and
+subsequent Ruff, mypy and the affected network-isolated suite passed.
 
 ## PB1 completed tasks
 

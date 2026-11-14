@@ -28,6 +28,8 @@ def pb2_env(tmp_path: Path) -> tuple[dict[str, str | Redacted], Redacted]:
             "THREAT_INTEL_TIMEOUT_SECONDS": "0.1",
             "THREAT_INTEL_CACHE_TTL_SECONDS": "60",
             "THREAT_INTEL_BULK_MAX_ITEMS": "3",
+            "INCIDENT_MAX_ALERTS": "3",
+            "INCIDENT_MAX_TEXT_CHARS": "128",
             "CELERY_BROKER_URL": broker,
             "REDIS_CACHE_URL": cache,
         },
@@ -77,6 +79,8 @@ def test_webhook_signing_secret_must_be_in_a_readable_file(
         "THREAT_INTEL_TIMEOUT_SECONDS",
         "THREAT_INTEL_CACHE_TTL_SECONDS",
         "THREAT_INTEL_BULK_MAX_ITEMS",
+        "INCIDENT_MAX_ALERTS",
+        "INCIDENT_MAX_TEXT_CHARS",
     ],
 )
 def test_limits_are_required_positive_values(

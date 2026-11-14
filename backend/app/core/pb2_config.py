@@ -35,6 +35,8 @@ class PB2Settings(BaseModel):
     threat_intel_timeout_seconds: PositiveFloat
     threat_intel_cache_ttl_seconds: PositiveInt
     threat_intel_bulk_max_items: PositiveInt
+    incident_max_alerts: PositiveInt
+    incident_max_text_chars: PositiveInt
     celery_broker_url: SecretStr
     redis_cache_url: SecretStr
 
@@ -89,6 +91,8 @@ def load_pb2_settings(environ: Mapping[str, str] | None = None) -> PB2Settings:
                 "threat_intel_timeout_seconds": source.get("THREAT_INTEL_TIMEOUT_SECONDS"),
                 "threat_intel_cache_ttl_seconds": source.get("THREAT_INTEL_CACHE_TTL_SECONDS"),
                 "threat_intel_bulk_max_items": source.get("THREAT_INTEL_BULK_MAX_ITEMS"),
+                "incident_max_alerts": source.get("INCIDENT_MAX_ALERTS"),
+                "incident_max_text_chars": source.get("INCIDENT_MAX_TEXT_CHARS"),
                 "celery_broker_url": SecretStr(_read_secret("CELERY_BROKER_URL", source)),
                 "redis_cache_url": SecretStr(_read_secret("REDIS_CACHE_URL", source)),
             }
