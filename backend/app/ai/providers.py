@@ -39,6 +39,7 @@ class MockLLM:
 
     def summarize(self, alert: AlertContext) -> SummaryResult:
         return SummaryResult(
+            mock=True,
             alert_id=alert.id,
             summary=(
                 f"Mock summary: {alert.source} reported rule {alert.rule_id} "
@@ -48,6 +49,7 @@ class MockLLM:
 
     def recommendations(self, alert: AlertContext) -> RecommendationResult:
         return RecommendationResult(
+            mock=True,
             alert_id=alert.id,
             recommendations=[
                 Recommendation(
@@ -59,6 +61,7 @@ class MockLLM:
 
     def analyze_comprehensive(self, alert: AlertContext) -> ComprehensiveResult:
         return ComprehensiveResult(
+            mock=True,
             alert_id=alert.id,
             summary=self.summarize(alert).summary,
             recommendations=self.recommendations(alert).recommendations,

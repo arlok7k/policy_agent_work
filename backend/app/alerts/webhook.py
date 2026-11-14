@@ -135,4 +135,4 @@ async def accept_webhook(request: Request, response: Response) -> WebhookAccepte
         # Do not release the reservation: publication may have succeeded.
         raise Unavailable() from None
     response.headers["Cache-Control"] = "no-store"
-    return WebhookAccepted()
+    return WebhookAccepted(accepted=True)

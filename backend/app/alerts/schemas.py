@@ -1,7 +1,7 @@
 """Public webhook input and accepted response schemas."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress
@@ -22,7 +22,7 @@ class WebhookAlert(BaseModel):
 
 
 class WebhookAccepted(BaseModel):
-    accepted: bool = True
+    accepted: Literal[True]
 
 
 class AlertView(BaseModel):

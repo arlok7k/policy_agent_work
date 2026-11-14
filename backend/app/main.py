@@ -23,6 +23,7 @@ from app.core.db import (
 )
 from app.core.errors import install_error_handling
 from app.core.health import router as health_router
+from app.core.openapi import HostFastAPI
 from app.core.pb2_config import load_pb2_settings
 from app.core.security import PasswordService
 from app.incidents.router import router as incidents_router
@@ -65,7 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine.dispose()
 
 
-app = FastAPI(title="SMART SOC host baseline", lifespan=lifespan)
+app = HostFastAPI(title="SMART SOC host baseline", lifespan=lifespan)
 app.middleware("http")(csrf_guard)
 install_error_handling(app)
 app.include_router(health_router)

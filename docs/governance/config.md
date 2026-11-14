@@ -78,8 +78,25 @@ PostgreSQL database named with an `_test` suffix, plus
 `TEST_DATABASE_DISPOSABLE=1`. Tests create and drop a private schema there. The
 flag and suffix alone do not make a database disposable. Tests that create and
 drop temporary PostgreSQL login roles also require a genuinely disposable cluster
-and `TEST_PG_CLUSTER_DISPOSABLE=1`, since roles are cluster-wide. Missing settings
-fail the tests rather than skipping them. Never point them at a shared cluster.
+and `TEST_PG_CLUSTER_DISPOSABLE=1`, since roles are cluster-wide. PB2 integration
+and contract tests also require two genuinely disposable Redis instances and
+`TEST_REDIS_DISPOSABLE=1`; each uses database 15. Missing settings fail the tests
+rather than skipping them. Never point them at shared services.
+
+CI runs `python scripts/ci_isolated_checks.py` against its disposable PostgreSQL
+and two Redis service containers. The script bridges only their loopback ports
+to temporary Unix sockets, runs checks in a network namespace with IP routing
+verified absent, and tears down the bridges. It requires passwordless `sudo`,
+`unshare`, `runuser` and `CI_DISPOSABLE_SERVICES=1`, which operators may set
+only after confirming all three services and the entire PostgreSQL cluster are
+genuinely disposable. Local operators may set its service ports, database
+user and database name with the documented command-line flags. Dependency
+installation and auditing run outside this namespace. The application itself
+installs only mock threat-intel and AI providers.
+
+After changing a host route or schema, regenerate the committed artifact with
+`make openapi PYTHON=<python>` and run `make openapi-check PYTHON=<python>`;
+`make check` includes the drift check and schema/status contract tests.
 
 Migrations must run with a DDL-capable PostgreSQL principal able to create or
 validate the non-login `hpb_app` role. The service must instead use a separate,

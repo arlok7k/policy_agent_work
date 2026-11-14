@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, text
 
 from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 from app.main import app
+from tests.contract.assertions import assert_response_contract
 from tests.integration.conftest import PB2API
 from tests.sensitive import Redacted
 
@@ -91,7 +92,7 @@ def _send(client: object, case: RouteCase, values: dict[str, object], headers: d
         "ai": {"alert_id": str(values["alert_id"])},
         "user_create": {
             "username": "matrix-new-user",
-            "password": Redacted.random(),
+            "password": values["new_password"],
             "role": "analyst",
         },
         "user_patch": {"id": str(values["user_id"]), "is_active": True},
@@ -158,6 +159,9 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
             json={"username": "outsider", "password": pb2_api.accounts["inactive"].password},
         )
         assert outsider_login.status_code == 200
+        assert_response_contract(
+            "POST", "/api/auth/login", outsider_login, pb2_api.accounts["inactive"].password
+        )
         credentials["outsider"] = _cookie_headers(outsider_login)
         client.cookies.clear()
         issued = client.post(
@@ -166,6 +170,7 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
             json={"name": "matrix-service", "ttl_seconds": 300},
         )
         assert issued.status_code == 201
+        assert_response_contract("POST", "/api/api-keys", issued)
         service_key = Redacted(issued.json()["secret"])
         credentials["service"] = {"Authorization": Redacted(f"Bearer {service_key.reveal()}")}
         client.cookies.clear()
@@ -175,6 +180,7 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
             json={"name": "matrix-delete", "ttl_seconds": 300},
         )
         assert issued_delete.status_code == 201
+        assert_response_contract("POST", "/api/api-keys", issued_delete, service_key)
         delete_id = issued_delete.json()["key"]["id"]
         delete_secret = Redacted(issued_delete.json()["secret"])
         assert isinstance(delete_secret, Redacted)
@@ -184,7 +190,19 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
             "incident_id": incident_id,
             "key_id": delete_id,
             "user_id": pb2_api.accounts["analyst"].id,
+            "new_password": Redacted.random(),
         }
+        new_password = values["new_password"]
+        assert isinstance(new_password, Redacted)
+        protected = [service_key, delete_secret, new_password]
+        for account in pb2_api.accounts.values():
+            protected.extend((account.password, account.digest))
+        for auth in credentials.values():
+            cookie = auth.get("Cookie")
+            if cookie is not None:
+                protected.extend(
+                    Redacted(part.partition("=")[2]) for part in cookie.reveal().split("; ")
+                )
         for case in ROLE_ROUTES:
             for principal, authentic in credentials.items():
                 headers = {**authentic, "X-Role": "admin"}
@@ -198,11 +216,13 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
                 else:
                     expected = case.success
                 assert response.status_code == expected, f"{case.method} {case.path} as {principal}"
+                assert_response_contract(case.method, case.path, response, *protected)
         # Every unsafe cookie request is denied before its handler without CSRF.
         for case in ROLE_ROUTES:
             if case.method != "GET":
                 response = _send(client, case, values, {"Cookie": credentials["admin"]["Cookie"]})
                 assert response.status_code == 403, f"CSRF: {case.method} {case.path}"
+                assert_response_contract(case.method, case.path, response, *protected)
         for path, body in (
             (
                 "/api/auth/login",
@@ -217,11 +237,13 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
                 path, headers={"Cookie": credentials["admin"]["Cookie"]}, json=body
             )
             assert response.status_code == 403, f"CSRF: {path}"
+            assert_response_contract("POST", path, response, *protected)
         # A valid service credential never inherits its owner's privileges.
         for principal, headers in credentials.items():
             client.cookies.clear()
             response = client.get("/api/auth/me", headers=headers)
             assert response.status_code == (401 if principal in {"anonymous", "inactive"} else 200)
+            assert_response_contract("GET", "/api/auth/me", response, *protected)
             client.cookies.clear()
             password = (
                 pb2_api.accounts[principal].password
@@ -237,29 +259,43 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
                 else 204
             )
             assert response.status_code == expected, f"reauth as {principal}"
+            assert_response_contract("POST", "/api/auth/reauth", response, *protected)
         client.cookies.clear()
-        assert client.get("/api/health").status_code == 200
+        health = client.get("/api/health")
+        assert health.status_code == 200
+        assert_response_contract("GET", "/api/health", health, *protected)
         response = client.post(
             "/api/auth/login",
             json={"username": "inactive", "password": pb2_api.accounts["inactive"].password},
         )
         assert response.status_code == 401
+        assert_response_contract("POST", "/api/auth/login", response, *protected)
         signing = Redacted(app.state.pb2_settings.webhook_secret.get_secret_value())
+        protected.append(signing)
         for principal, headers in credentials.items():
             client.cookies.clear()
-            assert (
-                client.post("/api/alerts/webhook", headers=headers, content=b"{}").status_code
-                == 401
-            )
+            unsigned = client.post("/api/alerts/webhook", headers=headers, content=b"{}")
+            assert unsigned.status_code == 401
+            assert_response_contract("POST", "/api/alerts/webhook", unsigned, *protected)
             body, signature = _signed_webhook(signing)
             client.cookies.clear()
             response = client.post(
                 "/api/alerts/webhook", headers={**headers, **signature}, content=body
             )
             assert response.status_code == (401 if principal == "inactive" else 202)
+            webhook_sig = signature["X-Webhook-Signature"]
+            assert isinstance(webhook_sig, Redacted)
+            assert_response_contract(
+                "POST", "/api/alerts/webhook", response, *protected, webhook_sig
+            )
         client.cookies.clear()
         mixed = {**credentials["admin"], **credentials["service"]}
-        assert client.get("/api/incidents", headers=mixed).status_code == 401
+        response = client.get("/api/incidents", headers=mixed)
+        assert response.status_code == 401
+        assert_response_contract("GET", "/api/incidents", response, *protected)
+        response = client.get("/api/health", headers=mixed)
+        assert response.status_code == 401
+        assert_response_contract("GET", "/api/health", response, *protected)
         for principal, headers in credentials.items():
             client.cookies.clear()
             response = client.post("/api/auth/logout", headers=headers)
@@ -271,5 +307,6 @@ def test_full_legacy_allow_deny_matrix(pb2_api: PB2API) -> None:
                 else 204
             )
             assert response.status_code == expected, f"logout as {principal}"
+            assert_response_contract("POST", "/api/auth/logout", response, *protected)
     finally:
         engine.dispose()

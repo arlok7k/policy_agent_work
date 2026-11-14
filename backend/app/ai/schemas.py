@@ -18,13 +18,13 @@ class Recommendation(BaseModel):
 
 
 class SummaryResult(BaseModel):
-    mock: Literal[True] = True
+    mock: Literal[True]
     alert_id: UUID
     summary: str
 
 
 class RecommendationResult(BaseModel):
-    mock: Literal[True] = True
+    mock: Literal[True]
     alert_id: UUID
     recommendations: list[Recommendation]
 
@@ -36,7 +36,7 @@ class AnalysisDetails(BaseModel):
 
 
 class ComprehensiveResult(BaseModel):
-    mock: Literal[True] = True
+    mock: Literal[True]
     alert_id: UUID
     summary: str
     recommendations: list[Recommendation]

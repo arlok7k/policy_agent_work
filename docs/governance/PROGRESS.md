@@ -18,7 +18,7 @@ namespace: 131 tests, Ruff and mypy. `make audit` and pre-commit also passed.
 | PB2-T06 | Done | Three deterministic `mock=true` AI routes with minimized alert context and no governance data; [DR-019](../adr/DR-019.md). The affected isolated suite passed 18 tests. |
 | PB2-T07 | Done | Bounded incident creation, scoped evidence and transactional investigation/audit with both mock adapters; [DR-020](../adr/DR-020.md). The affected isolated suite passed 46 tests. |
 | PB2-T08 | Done | Every host operation is inventoried and exercised across active roles, service, inactive, unlisted and anonymous principals, including CSRF and fail-closed policy checks; [DR-021](../adr/DR-021.md). The affected isolated suite passed 42 tests. |
-| PB2-T09 | In progress | Host OpenAPI export, schema/status contracts and isolated CI. |
+| PB2-T09 | Done locally | Reproducible OpenAPI 3.1 export, response/status schema contracts and network-isolated CI; [DR-023](../adr/DR-023.md). Full isolated `make check`: 235 passed; final-head CI is tracked in the PR checks. |
 
 PB2-T02's first lint run found an unused import, and its first mypy run found a
 third-party Redis type-parameter mismatch; both were corrected before the
@@ -47,6 +47,30 @@ PB2-PB4-FU01's first Ruff check found one unsorted import; it was fixed and the
 repeat checks passed. The affected isolated suite passed 65 tests, including a
 real Beat dispatch, worker initiator enforcement, database-clock bounded cleanup,
 active throttles and concurrent login/cleanup races.
+PB2-T09's first Ruff check found an extra blank import separator; the first CI
+runner check flagged a partial `make` path and an exec-process warning. The
+imports were formatted and `make` is now resolved before a fixed-argument,
+no-shell exec. Subsequent lint and mypy passed. The final local CI-equivalent
+command, `CI_DISPOSABLE_SERVICES=1 .venv/bin/python scripts/ci_isolated_checks.py`
+with the disposable local service ports and database explicitly supplied, verified
+no IPv4/IPv6 loopback or external route and passed Ruff, formatting, mypy,
+OpenAPI drift and **235 tests**. `make audit PYTHON=.venv/bin/python` found no
+known vulnerabilities, unrecognized licenses or secrets across 178 tracked
+files; all pre-commit hooks passed. LGPL legal review remains an open risk.
+GitHub final-head CI is tracked separately in the PR checks and is not implied
+by this local run.
+
+### PB2 acceptance evidence
+
+| Criterion | Evidence and status |
+|---|---|
+| AC-B2.1 | PB2 host operations are in `openapi.host.json`; real success/error responses and the complete legacy matrix are schema-checked by `backend/tests/contract/`. Local full suite passed; see PR checks for final-head CI. PB3 response routes are intentionally not claimed. |
+| AC-B2.2 | `backend/tests/integration/test_webhook.py` verifies missing/bad HMAC produces a generic rejection with no DB, broker or Redis effects; replay, malformed and oversized cases are also exercised. |
+| AC-B2.3 | `test_alert_storage.py` and the real webhook-to-worker integration test verify concurrent/queued fingerprint deduplication. |
+| AC-B2.4 | The application registers only mock providers. The CI-equivalent runner verified absent IP routes before all application tests, using only fixed Unix bridges to disposable PostgreSQL and Redis. See PR checks for GitHub CI. |
+
+Owner review/merge, PB4 baseline approval, and future-phase governance gates are
+pending; none is represented as passed by these local results.
 
 ## PB1 completed tasks
 
@@ -70,7 +94,7 @@ active throttles and concurrent login/cleanup races.
 |---|---|---|
 | PB1-R01 | Done locally | Normal short pytest diagnostics and captured output restored; test credentials wrapped; regression retained. Full suite: 131 passed; see the PR for CI status. |
 | PB1-R02 | Done | DR-002, DR-006, DR-009 and DR-013 approval is marked to be confirmed because exact owner messages are unavailable in the current context. |
-| PB1-R03 | Done | The four requested PB2/PB4/P1 follow-ups are tracked below; none has been started. |
+| PB1-R03 | Done | The four requested PB2/PB4/P1 follow-ups are tracked below; the scheduler follow-up is now completed in PB2. |
 
 PB1-R01's focused output regression passed (4 tests). The first audit flagged two
 nonsecret expected-value literals in its failure probes as secret-keyword false
@@ -173,8 +197,10 @@ not claimed as passing here (see DR-002). PB4 frontend/Compose checks are pendin
 
 **Open risks:** Login-throttle cleanup requires Beat to run and all API/worker
 replicas to share the same login window; source-IP quotas require a trusted
-proxy boundary and upstream volumetric controls. Legal
-review of the LGPL-3.0-only psycopg packages is still needed. The implemented
+proxy boundary and upstream volumetric controls. Redis loss can lose webhook
+replay reservations, and HTTP 202 means queued rather than persisted. Mock
+intelligence/AI output is synthetic and must not be mistaken for real provider
+results. Legal review of the LGPL-3.0-only psycopg packages is still needed. The implemented
 public health endpoint reveals database readiness to callers who can reach it;
 its approval evidence is to be confirmed.
 
