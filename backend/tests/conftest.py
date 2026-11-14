@@ -28,6 +28,9 @@ def pb2_test_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         "WEBHOOK_MAX_FIELD_CHARS": "128",
         "WEBHOOK_MAX_CLOCK_SKEW_SECONDS": "60",
         "REDIS_TIMEOUT_SECONDS": "1",
+        "THREAT_INTEL_TIMEOUT_SECONDS": "0.1",
+        "THREAT_INTEL_CACHE_TTL_SECONDS": "60",
+        "THREAT_INTEL_BULK_MAX_ITEMS": "3",
         "CELERY_BROKER_URL": "redis://127.0.0.1:1/0",
         "REDIS_CACHE_URL": "redis://127.0.0.1:2/0",
     }

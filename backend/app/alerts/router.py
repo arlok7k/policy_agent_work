@@ -19,7 +19,7 @@ from app.auth.session import SessionIdentity
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import BadRequest, NotFound, Unavailable
-from app.core.http import page_size
+from app.core.http import page_size, private_json
 from app.core.pagination import decode_cursor, encode_cursor
 from app.core.pb2_config import PB2Settings
 
@@ -45,11 +45,6 @@ def _text_filter(value: str | None, maximum: int, *, lowercase: bool = False) ->
     if not result or len(result) > maximum or "\x00" in result:
         raise BadRequest()
     return result.lower() if lowercase else result
-
-
-def _safe_response(response: Response) -> None:
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["X-Content-Type-Options"] = "nosniff"
 
 
 @router.get("", response_model=AlertPage)
@@ -102,7 +97,7 @@ def list_alerts(
         )
     except SQLAlchemyError:
         raise Unavailable() from None
-    _safe_response(response)
+    private_json(response)
     return result
 
 
@@ -123,7 +118,7 @@ def alert_summary(response: Response, identity: AlertReader, db: Database) -> Al
         )
     except SQLAlchemyError:
         raise Unavailable() from None
-    _safe_response(response)
+    private_json(response)
     return result
 
 
@@ -138,5 +133,5 @@ def alert_detail(
         result = AlertView.model_validate(alert)
     except SQLAlchemyError:
         raise Unavailable() from None
-    _safe_response(response)
+    private_json(response)
     return result

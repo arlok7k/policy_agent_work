@@ -24,6 +24,8 @@ from app.core.health import router as health_router
 from app.core.pb2_config import load_pb2_settings
 from app.core.security import PasswordService
 from app.jobs.celery_app import create_celery
+from app.threat_intel.providers import MockProvider
+from app.threat_intel.router import router as threat_intel_router
 from app.users.router import router as users_router
 
 
@@ -50,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         socket_timeout=pb2.redis_timeout_seconds,
     )
     app.state.celery = create_celery(pb2)
+    app.state.threat_provider = MockProvider()
     try:
         yield
     finally:
@@ -67,3 +70,4 @@ app.include_router(key_router)
 app.include_router(users_router)
 app.include_router(webhook_router)
 app.include_router(alerts_router)
+app.include_router(threat_intel_router)

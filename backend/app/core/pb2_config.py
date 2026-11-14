@@ -8,7 +8,15 @@ import re
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, PositiveInt, SecretStr, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    PositiveFloat,
+    PositiveInt,
+    SecretStr,
+    ValidationError,
+    field_validator,
+)
 
 from app.core.config import ConfigurationError, _read_secret
 
@@ -24,6 +32,9 @@ class PB2Settings(BaseModel):
     webhook_max_field_chars: PositiveInt
     webhook_max_clock_skew_seconds: PositiveInt
     redis_timeout_seconds: PositiveInt
+    threat_intel_timeout_seconds: PositiveFloat
+    threat_intel_cache_ttl_seconds: PositiveInt
+    threat_intel_bulk_max_items: PositiveInt
     celery_broker_url: SecretStr
     redis_cache_url: SecretStr
 
@@ -75,6 +86,9 @@ def load_pb2_settings(environ: Mapping[str, str] | None = None) -> PB2Settings:
                 "webhook_max_field_chars": source.get("WEBHOOK_MAX_FIELD_CHARS"),
                 "webhook_max_clock_skew_seconds": source.get("WEBHOOK_MAX_CLOCK_SKEW_SECONDS"),
                 "redis_timeout_seconds": source.get("REDIS_TIMEOUT_SECONDS"),
+                "threat_intel_timeout_seconds": source.get("THREAT_INTEL_TIMEOUT_SECONDS"),
+                "threat_intel_cache_ttl_seconds": source.get("THREAT_INTEL_CACHE_TTL_SECONDS"),
+                "threat_intel_bulk_max_items": source.get("THREAT_INTEL_BULK_MAX_ITEMS"),
                 "celery_broker_url": SecretStr(_read_secret("CELERY_BROKER_URL", source)),
                 "redis_cache_url": SecretStr(_read_secret("REDIS_CACHE_URL", source)),
             }

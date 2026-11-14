@@ -1,5 +1,6 @@
 {
   "users": ["admin"],
   "api_keys": ["admin"],
-  "alerts_read": ["analyst", "senior_analyst", "admin"]
+  "alerts_read": ["analyst", "senior_analyst", "admin"],
+  "threat_intel": ["analyst", "senior_analyst", "admin"]
 }

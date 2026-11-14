@@ -22,6 +22,9 @@ starting. Configuration failures do not print supplied values.
 | `WEBHOOK_MAX_BODY_BYTES`, `WEBHOOK_MAX_FIELD_CHARS` | Yes | Positive webhook byte and text-field caps; examples 262144 and 512. |
 | `WEBHOOK_MAX_CLOCK_SKEW_SECONDS` | Yes | Positive symmetric timestamp tolerance; example 300. |
 | `REDIS_TIMEOUT_SECONDS` | Yes | Positive Redis connection and operation timeout; example 2. |
+| `THREAT_INTEL_TIMEOUT_SECONDS` | Yes | Positive provider deadline; example 2. |
+| `THREAT_INTEL_CACHE_TTL_SECONDS` | Yes | Positive cache lifetime; example 3600. |
+| `THREAT_INTEL_BULK_MAX_ITEMS` | Yes | Positive maximum indicators per request; example 100. |
 | `CELERY_BROKER_URL` / `CELERY_BROKER_URL_FILE` | Exactly one | Redis broker URL; treated as a secret because it may contain credentials. |
 | `REDIS_CACHE_URL` / `REDIS_CACHE_URL_FILE` | Exactly one | URL of a separate Redis cache instance; treated as a secret. |
 
