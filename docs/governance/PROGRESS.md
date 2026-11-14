@@ -11,7 +11,7 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 | Task | Status | Notes |
 |---|---|---|
 | PB2-FIX01 | Done | Redis/publication 503 `Retry-After` follow-up; [DR-024](../adr/DR-024.md). The isolated affected suite passed 48 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
-| PB3-T01 | Pending | Migrations 006–008 and runtime privileges. |
+| PB3-T01 | Done | Migrations 006–008, immutable requests, decision/log constraints, singleton and runtime grants; [DR-025](../adr/DR-025.md). Full isolated `make check` passed 253 tests before a rollback-recovery refinement; its affected isolated suite then passed 31 tests. |
 | PB3-T02 | Pending | Action catalog, levels and parameter schemas. |
 | PB3-T03 | Pending | Pure, fail-closed Safeguards. |
 | PB3-T04 | Pending | Approval Gate and Four-Eyes state machine. |
@@ -25,6 +25,10 @@ formatting, mypy and OpenAPI drift checking against disposable services.
 PB2-FIX01's initial pre-commit invocation used the system Python without the
 locked tools on `PATH` and failed to import Ruff/mypy. With `.venv/bin` first
 on `PATH`, all pre-commit hooks passed; the staged secret scan had no findings.
+PB3-T01 had two Ruff E501 failures on long SQL literals, the second in a newly
+added schema-preservation test. The owner selected **“Fix and continue”**;
+those literals were split without changing SQL or assertions. Repeat lint,
+format, mypy, OpenAPI drift, affected and full isolated tests passed.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated
