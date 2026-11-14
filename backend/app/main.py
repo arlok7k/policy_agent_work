@@ -4,7 +4,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from redis import Redis
 
+from app.alerts.webhook import router as webhook_router
 from app.auth.csrf import csrf_guard
 from app.auth.key_router import router as key_router
 from app.auth.legacy_policy import load_legacy_policy
@@ -18,7 +20,9 @@ from app.core.db import (
 )
 from app.core.errors import install_error_handling
 from app.core.health import router as health_router
+from app.core.pb2_config import load_pb2_settings
 from app.core.security import PasswordService
+from app.jobs.celery_app import create_celery
 from app.users.router import router as users_router
 
 
@@ -26,6 +30,7 @@ from app.users.router import router as users_router
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         app.state.settings = load_settings()
+        app.state.pb2_settings = load_pb2_settings()
     except ConfigurationError:
         raise RuntimeError("Application configuration is invalid") from None
     app.state.legacy_policy = load_legacy_policy()
@@ -37,9 +42,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("Runtime database access is unsafe or unavailable") from None
     app.state.session_factory = create_session_factory(engine)
     app.state.passwords = PasswordService()
+    pb2 = app.state.pb2_settings
+    app.state.redis_cache = Redis.from_url(
+        pb2.redis_cache_url.get_secret_value(),
+        socket_connect_timeout=pb2.redis_timeout_seconds,
+        socket_timeout=pb2.redis_timeout_seconds,
+    )
+    app.state.celery = create_celery(pb2)
     try:
         yield
     finally:
+        app.state.celery.close()
+        app.state.redis_cache.close()
         engine.dispose()
 
 
@@ -50,3 +64,4 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(key_router)
 app.include_router(users_router)
+app.include_router(webhook_router)

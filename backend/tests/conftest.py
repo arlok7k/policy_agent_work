@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -10,6 +11,30 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
+
+from tests.sensitive import Redacted
+
+
+@pytest.fixture(autouse=True)
+def pb2_test_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide harmless PB2 startup configuration; live Redis tests override it."""
+    signing = Redacted.random(48)
+    secret_file = tmp_path / "webhook-signing"
+    secret_file.write_text(signing.reveal(), encoding="utf-8")
+    values = {
+        "WEBHOOK_SECRET_FILE": str(secret_file),
+        "WEBHOOK_INITIATOR": "service:test-webhook",
+        "WEBHOOK_MAX_BODY_BYTES": "4096",
+        "WEBHOOK_MAX_FIELD_CHARS": "128",
+        "WEBHOOK_MAX_CLOCK_SKEW_SECONDS": "60",
+        "REDIS_TIMEOUT_SECONDS": "1",
+        "CELERY_BROKER_URL": "redis://127.0.0.1:1/0",
+        "REDIS_CACHE_URL": "redis://127.0.0.1:2/0",
+    }
+    for key in ("WEBHOOK_SECRET", "CELERY_BROKER_URL_FILE", "REDIS_CACHE_URL_FILE"):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
 
 
 @pytest.fixture

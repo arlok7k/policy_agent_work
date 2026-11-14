@@ -17,6 +17,27 @@ starting. Configuration failures do not print supplied values.
 | `USERNAME_MAX_CHARS` | Yes | Positive upper bound for normalized usernames; example 128. |
 | `API_KEY_NAME_MAX_CHARS` | Yes | Positive upper bound for API-key names; example 128. |
 | `MAX_API_KEY_TTL_SECONDS` | Yes | Positive maximum API-key lifetime; example 2592000. |
+| `WEBHOOK_SECRET_FILE` | Yes | Path to an operator-provisioned Docker secret containing at least 32 bytes; inline `WEBHOOK_SECRET` is rejected. |
+| `WEBHOOK_INITIATOR` | Yes | Stable service identity, formatted `service:<name>`, attached to alert task headers. |
+| `WEBHOOK_MAX_BODY_BYTES`, `WEBHOOK_MAX_FIELD_CHARS` | Yes | Positive webhook byte and text-field caps; examples 262144 and 512. |
+| `WEBHOOK_MAX_CLOCK_SKEW_SECONDS` | Yes | Positive symmetric timestamp tolerance; example 300. |
+| `REDIS_TIMEOUT_SECONDS` | Yes | Positive Redis connection and operation timeout; example 2. |
+| `CELERY_BROKER_URL` / `CELERY_BROKER_URL_FILE` | Exactly one | Redis broker URL; treated as a secret because it may contain credentials. |
+| `REDIS_CACHE_URL` / `REDIS_CACHE_URL_FILE` | Exactly one | URL of a separate Redis cache instance; treated as a secret. |
+
+The two Redis instances must be provisioned separately; the loader rejects
+identical endpoints but cannot identify every possible DNS alias. Normal
+`redis://`/`rediss://` URLs are supported, as are `redis+socket:///...` for the
+broker and `unix:///...` for the cache. The application validates PB2 settings
+at startup but does not claim Redis readiness until a request actually uses it.
+The PB4 infrastructure has not yet been built.
+
+Webhook senders supply `X-Webhook-Timestamp` (Unix seconds), `X-Webhook-Id`
+(canonical lowercase UUID) and `X-Webhook-Signature` (`sha256=` plus the HMAC
+hex digest). The signed bytes are the timestamp, a dot, the UUID, a dot, then
+the exact JSON body bytes. Event-ID replay reservations are volatile Redis
+state; see [DR-016](../adr/DR-016.md) for the durability limitation, error
+statuses and ambiguous publication behavior. Configure synchronized clocks.
 
 For each pair, setting both is an error rather than choosing precedence. Secret
 files are read as UTF-8; one terminal newline is stripped. Length validation

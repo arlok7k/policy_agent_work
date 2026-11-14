@@ -30,6 +30,10 @@ class Conflict(HostError):
     http_status = 409
 
 
+class PayloadTooLarge(HostError):
+    http_status = 413
+
+
 class SemanticError(HostError):
     http_status = 422
 

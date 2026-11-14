@@ -16,6 +16,8 @@ dependencies = [
   "psycopg[binary]==3.3.9",
   "argon2-cffi==25.1.0",
   "uvicorn==0.54.0",
+  "celery[redis]==5.7.0",
+  "redis==8.1.0",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +27,7 @@ dev = [
   "httpx2==2.16.0",
   "ruff==0.17.5",
   "mypy==2.4.1",
+  "celery-types==0.26.0",
   "pre-commit==4.7.0",
   "pip-tools==7.6.2",
   "pip-audit==2.10.1",
