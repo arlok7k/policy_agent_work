@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import AuthSession
 from app.auth.schemas import PrincipalResponse
-from app.auth.session import SessionIdentity, session_rows
+from app.auth.session import SessionIdentity, session_digest, session_rows
 from app.auth.throttle import acquire_buckets, blocked, record_failure
 from app.core.activity import append_activity
 from app.core.config import Settings
@@ -71,9 +71,7 @@ def _new_login(
     db.add(
         AuthSession(
             user_id=user.id,
-            token_digest=credential_digest(
-                settings.session_signing_secret, "session", session_token
-            ),
+            token_digest=session_digest(settings, session_token),
             csrf_digest=credential_digest(settings.session_signing_secret, "csrf", csrf_token),
             expires_at=now + timedelta(seconds=settings.session_ttl_seconds),
         )

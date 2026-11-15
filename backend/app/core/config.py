@@ -55,9 +55,12 @@ class Settings(BaseModel):
     api_key_name_max_chars: PositiveInt
     max_api_key_ttl_seconds: PositiveInt
     trusted_proxy_ips: tuple[IPv4Address | IPv6Address, ...] = ()
+    dev_insecure_cookies: bool = False
 
     @model_validator(mode="after")
     def valid_policies(self) -> Settings:
+        if self.dev_insecure_cookies and self.environment != "development":
+            raise ValueError("insecure cookies are development-only")
         if self.password_min_chars > self.password_max_chars:
             raise ValueError("invalid password policy")
         if self.default_page_size > self.max_page_size:
@@ -130,6 +133,11 @@ def load_database_url(environ: Mapping[str, str] | None = None) -> SecretStr:
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     """Load settings once at startup; never include values in exceptions."""
     source = os.environ if environ is None else environ
+    dev_cookies = source.get("DEV_INSECURE_COOKIES")
+    if dev_cookies is not None and (
+        source.get("ENV") != "development" or dev_cookies not in {"true", "false"}
+    ):
+        raise ConfigurationError("Invalid application configuration")
     try:
         return Settings.model_validate(
             {
@@ -147,6 +155,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
                 "api_key_name_max_chars": source.get("API_KEY_NAME_MAX_CHARS"),
                 "max_api_key_ttl_seconds": source.get("MAX_API_KEY_TTL_SECONDS"),
                 "trusted_proxy_ips": source.get("TRUSTED_PROXY_IPS", ""),
+                "dev_insecure_cookies": dev_cookies == "true",
             }
         )
     except ValidationError:

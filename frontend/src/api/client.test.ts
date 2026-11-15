@@ -27,6 +27,20 @@ describe('same-origin API client', () => {
     expect(requests[1]?.headers.get('X-CSRF-Token') === secret.reveal()).toBe(true);
     expect(requests.every((request) => request.baseURL === '/api')).toBe(true);
   });
+  it('prefers the development CSRF cookie over a coexisting secure cookie on HTTP', async () => {
+    const development = Redacted.random();
+    const secure = Redacted.random();
+    vi.spyOn(document, 'cookie', 'get').mockReturnValue(
+      `__Host-soc_csrf=${secure.reveal()}; soc_dev_csrf=${development.reveal()}`,
+    );
+    let selected: unknown;
+    api.defaults.adapter = (config) => {
+      selected = config.headers.get('X-CSRF-Token');
+      return Promise.resolve({ data: {}, status: 200, statusText: 'OK', headers: {}, config });
+    };
+    await api.post('/auth/logout');
+    expect(selected === development.reveal()).toBe(true);
+  });
   it('rejects cross-origin and path traversal targets before dispatch', async () => {
     const adapter = vi.fn();
     api.defaults.adapter = adapter;

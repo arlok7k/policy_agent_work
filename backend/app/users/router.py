@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.roles import operation_roles, require_operation
-from app.auth.session import SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, request_session_token
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import Conflict, Unavailable
@@ -46,7 +46,7 @@ def users_list(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "users"),
             page_size(settings, limit),
             offset,
@@ -69,7 +69,7 @@ def users_create(
             settings,
             passwords,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "users"),
             body,
             request_peer_ip(request),
@@ -96,7 +96,7 @@ def users_update(
             settings,
             passwords,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "users"),
             body,
             request_peer_ip(request),

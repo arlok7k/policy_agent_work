@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.roles import operation_roles, require_operation
-from app.auth.session import SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, request_session_token
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import BadRequest, Unavailable
@@ -180,7 +180,7 @@ def create_action(
             pb2,
             pb3,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_request"),
             body,
             keys[0] if keys else None,
@@ -212,7 +212,7 @@ def _decision(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_decide"),
             action_id,
             decision,
@@ -272,7 +272,7 @@ def rollback(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_rollback"),
             action_id,
             request_peer_ip(request),
@@ -309,7 +309,7 @@ def kill_switch(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_kill_switch"),
             body.engaged,
             request_peer_ip(request),

@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.roles import operation_roles, require_operation
-from app.auth.session import SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, request_session_token
 from app.auth.transactions import lock_authorized_actor
 from app.core.activity import append_activity
 from app.core.config import Settings
@@ -81,7 +81,7 @@ def change_settings(
             actor, _ = lock_authorized_actor(
                 db,
                 settings,
-                request.cookies.get(SESSION_COOKIE, ""),
+                request_session_token(request) or "",
                 identity,
                 operation_roles(request, "settings"),
             )

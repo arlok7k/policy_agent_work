@@ -2,7 +2,8 @@ import axios from 'axios';
 
 export const UNAUTHENTICATED_EVENT = 'soc:unauthenticated';
 const safeMethods = new Set(['get', 'head', 'options']);
-const csrfCookies = ['__Host-soc_csrf', 'soc_dev_csrf'];
+const secureCsrfCookie = '__Host-soc_csrf';
+const developmentCsrfCookie = 'soc_dev_csrf';
 
 function cookieValue(name: string): string | null {
   const item = document.cookie.split('; ').find((part) => part.startsWith(`${name}=`));
@@ -23,7 +24,9 @@ api.interceptors.request.use((config) => {
   }
   config.baseURL = '/api';
   if (!safeMethods.has((config.method ?? 'get').toLowerCase())) {
-    const token = csrfCookies.map(cookieValue).find((value) => value !== null);
+    const names = window.location.protocol === 'http:'
+      ? [developmentCsrfCookie, secureCsrfCookie] : [secureCsrfCookie, developmentCsrfCookie];
+    const token = names.map(cookieValue).find((value) => value !== null);
     if (token) config.headers.set('X-CSRF-Token', token);
   }
   return config;

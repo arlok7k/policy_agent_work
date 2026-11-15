@@ -191,3 +191,26 @@ def test_proxy_addresses_are_exact_and_configuration_is_fail_closed(
         env_values["TRUSTED_PROXY_IPS"] = invalid
         with pytest.raises(ConfigurationError):
             load_settings(reveal(env_values))
+
+
+def test_insecure_cookie_mode_is_explicit_and_development_only(
+    env_values: dict[str, str | Redacted],
+) -> None:
+    env_values["ENV"] = "development"
+    assert not load_settings(reveal(env_values)).dev_insecure_cookies
+    env_values["DEV_INSECURE_COOKIES"] = "false"
+    assert not load_settings(reveal(env_values)).dev_insecure_cookies
+    env_values["DEV_INSECURE_COOKIES"] = "true"
+    assert load_settings(reveal(env_values)).dev_insecure_cookies
+    for invalid in ("", "1", "TRUE", "yes", "garbage"):
+        env_values["DEV_INSECURE_COOKIES"] = invalid
+        with pytest.raises(ConfigurationError):
+            load_settings(reveal(env_values))
+    for environment in ("production", "test"):
+        env_values["ENV"] = environment
+        for value in ("true", "false"):
+            env_values["DEV_INSECURE_COOKIES"] = value
+            with pytest.raises(ConfigurationError):
+                load_settings(reveal(env_values))
+        del env_values["DEV_INSECURE_COOKIES"]
+        assert not load_settings(reveal(env_values)).dev_insecure_cookies

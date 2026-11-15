@@ -6,14 +6,19 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.auth.key_credentials import authenticate_api_key
 from app.auth.schemas import PrincipalResponse
-from app.auth.session import SESSION_COOKIE, SessionIdentity, identity_from_rows, session_rows
+from app.auth.session import (
+    SessionIdentity,
+    identity_from_rows,
+    request_session_token,
+    session_rows,
+)
 from app.core.config import Settings
 from app.core.exceptions import Forbidden, Unauthenticated, Unavailable
 from app.core.logging import mark_principal
 
 
 def current_user(request: Request) -> SessionIdentity:
-    token = request.cookies.get(SESSION_COOKIE)
+    token = request_session_token(request)
     authorization = request.headers.get("Authorization")
     if token and authorization is not None:
         raise Unauthenticated()
@@ -40,7 +45,7 @@ def current_user(request: Request) -> SessionIdentity:
 def current_principal(request: Request) -> PrincipalResponse:
     authorization = request.headers.get("Authorization")
     if authorization is not None:
-        if request.cookies.get(SESSION_COOKIE):
+        if request_session_token(request):
             raise Unauthenticated()
         key_id = authenticate_api_key(request)
         mark_principal(request, "service", key_id)
