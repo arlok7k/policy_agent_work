@@ -25,19 +25,26 @@ describe('authentication and navigation shell', () => {
   });
   it('uses me after login, restores the requested route and responds to expiry', async () => {
     const password = Redacted.random();
-    vi.mocked(api.get).mockRejectedValueOnce(unauthorized).mockResolvedValue({ data: { principal } });
+    let meCount = 0;
+    vi.mocked(api.get).mockImplementation(((path: string) => {
+      if (path === '/auth/me') return ++meCount === 1 ? Promise.reject(unauthorized) : Promise.resolve({ data: { principal } });
+      if (path === '/presentation') return Promise.resolve({ data: { display_name: 'SMART SOC', default_direction: 'rtl' } });
+      if (path === '/alerts') return Promise.resolve({ data: { items: [], next_cursor: null } });
+      return Promise.reject(new Error(`Unexpected request: ${path}`));
+    }) as typeof api.get);
     vi.mocked(api.post).mockResolvedValue({ data: { principal } });
     mount('/alerts');
     fireEvent.change(await screen.findByLabelText('Username'), { target: { value: 'analyst' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: password.reveal() } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Alerts' })).toBeInTheDocument();
-    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(api.get).mock.calls.filter(([path]) => path === '/auth/me')).toHaveLength(2);
     window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
   });
   it('provides administration navigation and switches RTL/LTR and language', async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { principal } });
+    vi.mocked(api.get).mockImplementation(((path: string) => Promise.resolve({ data: path === '/auth/me'
+      ? { principal } : { display_name: 'SMART SOC', default_direction: 'rtl' } })) as typeof api.get);
     mount('/policies');
     expect(await screen.findByText('Governance Plane — built in P9')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Administration' })).toBeInTheDocument();

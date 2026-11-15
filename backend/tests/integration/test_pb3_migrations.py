@@ -329,7 +329,7 @@ def test_pb3_revisions_downgrade_and_reupgrade_individually(migrated_url: str) -
         with engine.connect() as db:
             assert (
                 db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "008_response_safety"
+                == "009_host_settings"
             )
     finally:
         engine.dispose()
@@ -421,7 +421,7 @@ def test_pb3_migrations_leave_the_pb1_pb2_schema_unchanged(migrated_url: str) ->
             )
             assert (
                 db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "008_response_safety"
+                == "009_host_settings"
             )
     finally:
         engine.dispose()

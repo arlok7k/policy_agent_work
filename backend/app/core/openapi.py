@@ -21,6 +21,11 @@ _ROLE_OPERATIONS: dict[tuple[str, str], str] = {
     ("get", "/api/incidents/{incident_id}/evidence"): "incidents_read",
     ("get", "/api/response/catalog"): "response_read",
     ("get", "/api/response/actions"): "response_read",
+    ("get", "/api/response/commands"): "response_read",
+    ("get", "/api/response/kill-switch"): "response_read",
+    ("get", "/api/presentation"): "presentation_read",
+    ("get", "/api/settings"): "settings",
+    ("patch", "/api/settings"): "settings",
     ("post", "/api/response/actions"): "response_request",
     ("post", "/api/response/actions/{action_id}/approve"): "response_decide",
     ("post", "/api/response/actions/{action_id}/reject"): "response_decide",
@@ -57,6 +62,11 @@ _ERRORS: dict[tuple[str, str], tuple[int, ...]] = {
     ("get", "/api/incidents/{incident_id}/evidence"): (*_COMMON, 404, 422),
     ("get", "/api/response/catalog"): (401, 403, 500, 503),
     ("get", "/api/response/actions"): (*_COMMON, 422),
+    ("get", "/api/response/commands"): (*_COMMON, 422),
+    ("get", "/api/response/kill-switch"): (401, 403, 500, 503),
+    ("get", "/api/presentation"): (401, 403, 500, 503),
+    ("get", "/api/settings"): (401, 403, 500, 503),
+    ("patch", "/api/settings"): (*_COMMON, 422),
     ("post", "/api/response/actions"): (*_COMMON, 404, 409, 422),
     ("post", "/api/response/actions/{action_id}/approve"): (*_COMMON, 404, 409),
     ("post", "/api/response/actions/{action_id}/reject"): (*_COMMON, 404, 409),
@@ -107,6 +117,20 @@ _DESCRIPTIONS: dict[tuple[str, str], str] = {
     ),
     ("post", "/api/threat-intel/bulk-check"): (
         "Only deterministic mock results are available; THREAT_INTEL_BULK_MAX_ITEMS bounds input."
+    ),
+    ("get", "/api/response/commands"): (
+        "Append-only simulated execution and rollback records, ordered by descending ID; "
+        "bounded by DEFAULT_PAGE_SIZE and MAX_PAGE_SIZE, optionally filtered by action_id."
+    ),
+    ("get", "/api/response/kill-switch"): (
+        "Current automation switch state; changed_by is null until the first change."
+    ),
+    ("get", "/api/presentation"): (
+        "Read-only display name and default direction for all active host users."
+    ),
+    ("patch", "/api/settings"): (
+        "Administrator-only presentation settings; display_name uses USERNAME_MAX_CHARS. "
+        "Every change is audited atomically; operational and security policy is not editable."
     ),
     ("get", "/api/response/actions"): (
         "All active legacy roles share visibility. Supports incident filtering and bounded "

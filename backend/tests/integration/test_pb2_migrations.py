@@ -188,7 +188,7 @@ def test_pb2_revisions_downgrade_and_reupgrade_individually(migrated_url: str) -
         assert {"alerts", "incidents", "incident_alerts", "evidence", "ioc_cache"} <= names
         with engine.connect() as db:
             assert db.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-                "008_response_safety"
+                "009_host_settings"
             )
             assert {
                 "response_actions",

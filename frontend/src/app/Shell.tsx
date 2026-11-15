@@ -5,9 +5,11 @@ import { mapProblem } from '../api/problem';
 import { useI18n } from '../i18n/context';
 import { useAuth } from './auth-context';
 import { navigation } from './navigation';
+import { usePresentation } from './presentation-context';
 
 export function Shell() {
   const { state, logout } = useAuth();
+  const { presentation, unavailable } = usePresentation();
   const { t, direction, setDirection, language, setLanguage } = useI18n();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -24,7 +26,7 @@ export function Shell() {
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`} aria-label="Primary navigation">
         <Link className="brand" to="/" onClick={() => setOpen(false)}>
           <span className="brand-mark"><ShieldCheck size={22} strokeWidth={2.2} /></span>
-          <span><strong>SMART <span>SOC</span></strong><small>SECURITY OPERATIONS</small></span>
+          <span><strong>{presentation.display_name}</strong><small>SECURITY OPERATIONS</small></span>
         </Link>
         <div className="workspace-label"><span className="workspace-icon"><ShieldCheck size={15} /></span>
           <span><strong>{t('workspace')}</strong><small>{t('baseline')}</small></span><span className="workspace-dot" />
@@ -56,6 +58,7 @@ export function Shell() {
             <button className="icon-button" aria-label={t('signOut')} title={t('signOut')} onClick={() => void signOut()}><LogOut size={18} /></button>
           </div>
         </header>
+        {unavailable && <div role="status" className="inline-error">Presentation settings unavailable; using local defaults.</div>}
         {error && <div role="alert" className="inline-error">{error}</div>}
         <main id="main-content" className="content"><Outlet /></main>
       </div>

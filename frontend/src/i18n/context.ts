@@ -5,6 +5,7 @@ export interface I18nValue {
   direction: Direction;
   setLanguage: (language: Language) => void;
   setDirection: (direction: Direction) => void;
+  applyDefaultDirection: (direction: Direction) => void;
   t: (key: MessageKey) => string;
 }
 export const I18nContext = createContext<I18nValue | null>(null);

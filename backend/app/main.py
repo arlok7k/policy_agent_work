@@ -30,6 +30,8 @@ from app.core.security import PasswordService
 from app.incidents.router import router as incidents_router
 from app.jobs.celery_app import create_celery
 from app.response.router import router as response_router
+from app.settings.router import presentation_router
+from app.settings.router import router as settings_router
 from app.threat_intel.providers import MockProvider
 from app.threat_intel.router import router as threat_intel_router
 from app.users.router import router as users_router
@@ -82,3 +84,5 @@ app.include_router(threat_intel_router)
 app.include_router(ai_router)
 app.include_router(incidents_router)
 app.include_router(response_router)
+app.include_router(settings_router)
+app.include_router(presentation_router)

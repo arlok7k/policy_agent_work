@@ -38,6 +38,11 @@ ROLE_ROUTES = (
     RouteCase("GET", "/api/incidents/{incident_id}/evidence", "all", 200),
     RouteCase("GET", "/api/response/catalog", "all", 200),
     RouteCase("GET", "/api/response/actions", "all", 200),
+    RouteCase("GET", "/api/response/commands", "all", 200),
+    RouteCase("GET", "/api/response/kill-switch", "all", 200),
+    RouteCase("GET", "/api/presentation", "all", 200),
+    RouteCase("GET", "/api/settings", "admin", 200),
+    RouteCase("PATCH", "/api/settings", "admin", 200, "settings"),
     RouteCase("POST", "/api/response/actions", "all", 201, "response_create"),
     RouteCase(
         "POST", "/api/response/actions/{action_id}/approve", "senior", 200, "response_decision"
@@ -101,6 +106,7 @@ def _send(client: object, case: RouteCase, values: dict[str, object], headers: d
     bodies = {
         "investigate": {},
         "switch": {"engaged": True},
+        "settings": {"display_name": "Matrix workspace", "default_direction": "rtl"},
         "response_create": {
             "incident_id": str(values["incident_id"]),
             "action_type": "ioc_add",

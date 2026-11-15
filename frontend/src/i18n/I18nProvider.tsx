@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { I18nContext } from './context';
 import { messages } from './messages';
@@ -12,15 +12,24 @@ function preference<T extends string>(key: string, allowed: readonly T[], fallba
 }
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(() => preference('soc.language', ['en', 'ar'], 'en'));
-  const [direction, setDirection] = useState<Direction>(() => preference('soc.direction', ['ltr', 'rtl'], 'rtl'));
+  const [direction, setDirectionState] = useState<Direction>(() => preference('soc.direction', ['ltr', 'rtl'], 'rtl'));
+  const hasUserDirection = useRef(preference('soc.direction', ['ltr', 'rtl', 'none'], 'none') !== 'none');
+  const setDirection = useCallback((next: Direction) => {
+    hasUserDirection.current = true;
+    setDirectionState(next);
+    try { localStorage.setItem('soc.direction', next); } catch { /* Preferences are optional. */ }
+  }, []);
+  const applyDefaultDirection = useCallback((next: Direction) => {
+    if (!hasUserDirection.current) setDirectionState(next);
+  }, []);
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = direction;
-    try { localStorage.setItem('soc.language', language); localStorage.setItem('soc.direction', direction); }
+    try { localStorage.setItem('soc.language', language); }
     catch { /* A disabled preference store must not block the application. */ }
   }, [language, direction]);
-  const value = useMemo(() => ({ language, direction, setLanguage, setDirection,
+  const value = useMemo(() => ({ language, direction, setLanguage, setDirection, applyDefaultDirection,
     t: (key: MessageKey) => messages[language][key],
-  }), [language, direction]);
+  }), [language, direction, setDirection, applyDefaultDirection]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

@@ -55,3 +55,29 @@ class ActionView(BaseModel):
 class ActionPage(BaseModel):
     items: list[ActionView]
     next_cursor: str | None
+
+
+class ExecutedCommandView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    action_id: UUID
+    phase: Literal["execute", "rollback"]
+    connector: str
+    command: str
+    target: dict[str, Any]
+    params: dict[str, Any]
+    initiator: str
+    simulated: bool
+    executed_at: datetime
+
+
+class ExecutedCommandPage(BaseModel):
+    items: list[ExecutedCommandView]
+    next_before_id: int | None
+
+
+class KillSwitchStateView(BaseModel):
+    engaged: bool
+    changed_by: UUID | None
+    changed_at: datetime

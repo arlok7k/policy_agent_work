@@ -9,11 +9,11 @@ local run passed 354 tests. The current sandbox has Node but no Docker, browser,
 Python 3.15 environment or disposable DB/Redis services; local tooling and a
 way to execute the required Compose tests must be established rather than
 skipping them. A disposable PostgreSQL 18.6 cluster and two Redis 8.2.11
-instances have now been provisioned locally. The first isolated baseline
-reached Ruff successfully but local mypy failed because the locally compiled
-Python lacked the `_sqlite3` standard-library module; Python is being repaired
-and the full baseline must be repeated. This is a toolchain failure, not a
-passing local baseline; the unchanged merge-head GitHub CI remains green.
+instances were provisioned locally. The first isolated baseline reached Ruff
+but local mypy failed because the locally compiled Python lacked `_sqlite3`.
+After repairing that toolchain, the unchanged backend passed **354 tests**,
+Ruff, mypy and OpenAPI in a namespace verified to have no IP route. The
+merge-head GitHub CI also remains green.
 
 ## PB4 task list
 
@@ -21,7 +21,7 @@ passing local baseline; the unchanged merge-head GitHub CI remains green.
 |---|---|---|
 | PB4-T01 | Done | Pinned React/Vite/TypeScript/Tailwind toolchain and hash-integrity lock; [DR-034](../adr/DR-034.md). On Node 26.13.1: ESLint, strict TypeScript, Vitest (1 test) and Vite build passed. The first npm audit identified React Router 6 and minimatch advisories; after moving to Router 7 and a scoped tested minimatch override, the repeat found zero vulnerabilities. |
 | PB4-T02 | Done | Cookie/CSRF same-origin client, `/auth/me` guards, outage/session-expiry handling, RTL/LTR, English/Arabic shell scaffold, accessible navigation and error boundary; [DR-035](../adr/DR-035.md). Node 26 ESLint, strict TypeScript, build and 7 Vitest tests passed. The first lint run flagged unused boundary parameters and a navigation filename; the first type-check flagged an optional test adapter assignment. Both were corrected before the passing repeat. |
-| PB4-T03 | Pending | Host pages and the owner-authorized minimal missing APIs. |
+| PB4-T03 | Done | API-backed host pages, explicit placeholders and admin-only audited presentation settings; real command-log and Kill Switch reads plus the owner-authorized read-only presentation projection. [DR-036](../adr/DR-036.md), [DR-037](../adr/DR-037.md). Focused backend suites: 38 passed; full no-IP suite: 358 passed with Ruff, format, mypy and OpenAPI; frontend: 11 tests, lint, type-check and build passed. Vite reports a non-failing large-chunk warning. |
 | PB4-T04 | Pending | Reusable accessible UI primitives. |
 | PB4-FU01 | Pending | Explicit trusted Nginx proxy and real client IP. |
 | PB4-FU02 | Pending | Explicit development-only HTTP cookie opt-in; production stays Secure. |
@@ -35,7 +35,10 @@ The owner selected **“Add minimal endpoints (recommended)”** for the missing
 settings, command-log and Kill Switch read APIs, preserving existing behavior.
 For settings the owner chose **“Presentation settings (recommended)”**:
 admin-only audited display-name and default-direction changes in a new host-only
-table, with no security-policy changes. For proxy attribution the owner chose
+table, with no security-policy changes. The owner then selected **“Read-only
+presentation endpoint (recommended)”** so all active users can receive just
+those two presentation values while the administrative settings API remains
+admin-only. For proxy attribution the owner chose
 **“Explicit proxy IP (recommended)”**: only configured proxy addresses are
 trusted and Nginx overwrites forwarded headers. For local cookies the owner chose
 **“Explicit dev-only opt-in (recommended)”**: separate non-Secure cookie names
@@ -44,7 +47,11 @@ The selected visual direction is **“Dark SOC console (recommended)”**. For
 clean-checkout secrets the owner chose **“Development bootstrap (recommended)”**:
 an explicit development-only command will create ignored throwaway random files;
 production secrets remain operator-provisioned. Exact choices and their
-consequences will be recorded in the relevant task DRs.
+consequences will be recorded in the relevant task DRs. PB4-T03 initially
+reported Ruff line lengths (resolved by formatting), then frontend lint and
+type narrowing issues (corrected); its first full frontend test run failed two
+shell tests because their old mock returned auth data for every newly added
+endpoint. Route-specific mocks fixed the cause and all 11 tests passed.
 
 ## PB3 completion record
 
