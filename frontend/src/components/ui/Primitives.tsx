@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { ToastContext } from './toast-context';
 import type { ToastKind } from './toast-context';
 
@@ -22,7 +22,7 @@ export function Pagination({ canPrevious, canNext, previous, next, label = 'Pagi
     <button type="button" className="button button-quiet" disabled={!canNext} onClick={next}>Next</button></nav>;
 }
 
-/** Native modal dialog supplies focus containment; the trigger regains focus on close. */
+/** Native modal dialog plus cyclic keyboard focus; the trigger regains focus on close. */
 export function Dialog({ open, title, onClose, children }: {
   open: boolean; title: string; onClose: () => void; children: ReactNode;
 }) {
@@ -38,7 +38,23 @@ export function Dialog({ open, title, onClose, children }: {
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
   }, [open]);
-  return <dialog ref={element} className="dialog" aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onClose(); }}>
+  function containFocus(event: KeyboardEvent<HTMLDialogElement>) {
+    if (event.key !== 'Tab') return;
+    const dialog = event.currentTarget;
+    const elements = [...dialog.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex], [contenteditable="true"]')]
+      .filter((item) => (item.tabIndex >= 0 || (item.isContentEditable && !item.hasAttribute('tabindex')))
+        && !item.matches(':disabled') && !item.closest('[hidden], [inert]') && item.getClientRects().length > 0);
+    const first = elements[0];
+    const last = elements.at(-1);
+    if (!first || !last) { event.preventDefault(); return; }
+    const current = document.activeElement;
+    if (event.shiftKey && (current === first || !dialog.contains(current))) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && (current === last || !dialog.contains(current))) {
+      event.preventDefault(); first.focus();
+    }
+  }
+  return <dialog ref={element} className="dialog" aria-labelledby={titleId} onKeyDown={containFocus} onCancel={(event) => { event.preventDefault(); onClose(); }}>
     <div className="dialog-heading"><h2 id={titleId}>{title}</h2><button className="icon-button" type="button" aria-label="Close dialog" onClick={onClose}><X size={18} /></button></div>
     <div className="dialog-content">{children}</div>
   </dialog>;

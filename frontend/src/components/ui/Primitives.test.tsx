@@ -37,6 +37,20 @@ describe('reusable accessible primitives', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+  it('cycles keyboard focus within the modal in both directions', () => {
+    const rects = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue({ length: 1 } as DOMRectList);
+    try {
+      render(<ModalExample />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open review' }));
+      const dialog = screen.getByRole('dialog', { name: 'Review action' });
+      const close = screen.getByRole('button', { name: 'Close dialog' });
+      const done = screen.getByRole('button', { name: 'Done' });
+      done.focus(); fireEvent.keyDown(dialog, { key: 'Tab' });
+      expect(close).toHaveFocus();
+      fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+      expect(done).toHaveFocus();
+    } finally { rects.mockRestore(); }
+  });
   it('associates form labels, hints and validation errors with controls', () => {
     render(<FormField id="indicator" label="Indicator" hint="Use an IP address" error="Required">{(field) => <input {...field} />}</FormField>);
     const input = screen.getByRole('textbox', { name: 'Indicator' });
