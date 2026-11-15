@@ -17,10 +17,22 @@ def private_json(response: Response) -> None:
 
 
 def request_peer_ip(request: Request) -> PeerIP:
+    """Use one proxy-overwritten address only from an explicitly trusted peer.
+
+    The ASGI server must not rewrite client addresses from forwarded headers.
+    Untrusted peers cannot influence attribution using any forwarded header.
+    """
     try:
         if request.client is None:
             raise ValueError("missing peer")
-        return ip_address(request.client.host)
+        peer = ip_address(request.client.host)
+        settings: Settings = request.app.state.settings
+        if peer not in settings.trusted_proxy_ips:
+            return peer
+        forwarded = request.headers.getlist("X-Forwarded-For")
+        if len(forwarded) != 1 or "," in forwarded[0] or "%" in forwarded[0]:
+            raise ValueError("missing or ambiguous forwarded address")
+        return ip_address(forwarded[0].strip())
     except ValueError:
         raise BadRequest() from None
 
