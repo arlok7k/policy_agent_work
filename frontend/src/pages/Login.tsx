@@ -36,7 +36,7 @@ export function Login() {
       {error && <p className="form-error" role="alert">{error}</p>}
       <form onSubmit={(event) => void submit(event)} className="login-form">
         <label>{t('username')}<input autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} /></label>
-        <label>{t('password')}<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <label>{t('credentialLabel')}<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         <button className="button button-primary login-submit" disabled={busy || state.status === 'loading'}>
           {busy ? t('signingIn') : t('signIn')} <ArrowRight size={17} aria-hidden="true" /></button>
       </form>

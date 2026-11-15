@@ -27,7 +27,7 @@ merge-head GitHub CI also remains green.
 | PB4-FU02 | Backend/frontend implemented; browser verification pending | Explicit development-only HTTP cookie namespace and domain-separated session digests; production/test reject the flag and retain Secure `__Host-` cookies; [DR-040](../adr/DR-040.md). Full no-IP backend run passed Ruff, format, mypy, OpenAPI and 362 tests, including dev HTTP login/CSRF/approval/logout and replay rejection. Frontend lint, type-check, 17 tests and build passed; real browser verification remains PB4-T08. |
 | PB4-T05 | Pending | Compose, internal networks, secrets and health checks. |
 | PB4-T06 | Pending | Nginx proxy, TLS-ready config and security headers. |
-| PB4-T07 | Pending | Preserve backend CI and add frontend/Compose gates. |
+| PB4-T07 | In progress | The first full secret scan flagged the nonsecret English password-label translation as a keyword false positive. Renaming the translation key without changing its displayed value fixed the scan; dependency/license/secret audit and frontend lint, type-check, 17 tests and build passed. Frontend and Compose CI gates remain. |
 | PB4-T08 | Pending | Real Compose Playwright smoke and security tests. |
 | PB4-T09 | Pending | Operator README, webhook signing, stubs and phase evidence. |
 
