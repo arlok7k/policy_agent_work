@@ -1,0 +1,222 @@
+name: smart-soc
+
+x-app-environment: &app-environment
+  ENV: ${ENV:-development}
+  DEV_INSECURE_COOKIES:
+  TRUSTED_PROXY_IPS: 172.30.42.2
+  DATABASE_URL_FILE: /run/secrets/runtime_database_url
+  SESSION_SIGNING_SECRET_FILE: /run/secrets/session_signing_secret
+  SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+  LOGIN_FAILURE_LIMIT: ${LOGIN_FAILURE_LIMIT:-5}
+  LOGIN_WINDOW_SECONDS: ${LOGIN_WINDOW_SECONDS:-60}
+  PASSWORD_MIN_CHARS: ${PASSWORD_MIN_CHARS:-14}
+  PASSWORD_MAX_CHARS: ${PASSWORD_MAX_CHARS:-1024}
+  DEFAULT_PAGE_SIZE: ${DEFAULT_PAGE_SIZE:-50}
+  MAX_PAGE_SIZE: ${MAX_PAGE_SIZE:-100}
+  USERNAME_MAX_CHARS: ${USERNAME_MAX_CHARS:-128}
+  API_KEY_NAME_MAX_CHARS: ${API_KEY_NAME_MAX_CHARS:-128}
+  MAX_API_KEY_TTL_SECONDS: ${MAX_API_KEY_TTL_SECONDS:-2592000}
+  WEBHOOK_SECRET_FILE: /run/secrets/webhook_secret
+  WEBHOOK_INITIATOR: ${WEBHOOK_INITIATOR:-service:alert-webhook}
+  WEBHOOK_MAX_BODY_BYTES: ${WEBHOOK_MAX_BODY_BYTES:-262144}
+  WEBHOOK_MAX_FIELD_CHARS: ${WEBHOOK_MAX_FIELD_CHARS:-512}
+  WEBHOOK_MAX_CLOCK_SKEW_SECONDS: ${WEBHOOK_MAX_CLOCK_SKEW_SECONDS:-300}
+  WEBHOOK_RETRY_AFTER_SECONDS: ${WEBHOOK_RETRY_AFTER_SECONDS:-30}
+  REDIS_TIMEOUT_SECONDS: ${REDIS_TIMEOUT_SECONDS:-2}
+  THREAT_INTEL_TIMEOUT_SECONDS: ${THREAT_INTEL_TIMEOUT_SECONDS:-2}
+  THREAT_INTEL_CACHE_TTL_SECONDS: ${THREAT_INTEL_CACHE_TTL_SECONDS:-3600}
+  THREAT_INTEL_BULK_MAX_ITEMS: ${THREAT_INTEL_BULK_MAX_ITEMS:-100}
+  INCIDENT_MAX_ALERTS: ${INCIDENT_MAX_ALERTS:-100}
+  INCIDENT_MAX_TEXT_CHARS: ${INCIDENT_MAX_TEXT_CHARS:-4096}
+  THROTTLE_CLEANUP_INTERVAL_SECONDS: ${THROTTLE_CLEANUP_INTERVAL_SECONDS:-300}
+  THROTTLE_CLEANUP_BATCH_SIZE: ${THROTTLE_CLEANUP_BATCH_SIZE:-500}
+  THROTTLE_CLEANUP_INITIATOR: ${THROTTLE_CLEANUP_INITIATOR:-service:throttle-cleanup}
+  CELERY_BROKER_URL: redis://redis-broker:6379/0
+  REDIS_CACHE_URL: redis://redis-cache:6379/0
+  RESPONSE_SWEEP_INTERVAL_SECONDS: ${RESPONSE_SWEEP_INTERVAL_SECONDS:-5}
+  RESPONSE_SWEEP_BATCH_SIZE: ${RESPONSE_SWEEP_BATCH_SIZE:-100}
+  RESPONSE_L2_TTL_DEFAULT_SECONDS: ${RESPONSE_L2_TTL_DEFAULT_SECONDS:-3600}
+  RESPONSE_L2_TTL_MAX_SECONDS: ${RESPONSE_L2_TTL_MAX_SECONDS:-86400}
+
+x-backend: &backend-base
+  image: smart-soc-backend:pb4
+  build:
+    context: ..
+    dockerfile: infra/Dockerfile.backend
+  user: "10001:10001"
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001,mode=1770
+  networks: [internal]
+
+x-app-secrets: &app-secrets
+  - runtime_database_url
+  - session_signing_secret
+  - webhook_secret
+
+x-app-dependencies: &app-dependencies
+  migrate:
+    condition: service_completed_successfully
+  redis-broker:
+    condition: service_healthy
+  redis-cache:
+    condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:18.6
+    user: "999:999"
+    init: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      POSTGRES_USER: hpb_owner
+      POSTGRES_DB: smart_soc
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    secrets: [postgres_password]
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hpb_owner -d smart_soc"]
+      interval: 5s
+      timeout: 4s
+      retries: 24
+      start_period: 15s
+
+  redis-broker:
+    image: redis:8.2.11
+    user: "999:999"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["redis-server", "--bind", "0.0.0.0", "--protected-mode", "no", "--save", "", "--appendonly", "no", "--dir", "/tmp"]
+    tmpfs: ["/tmp:rw,nosuid,nodev,noexec,size=16m"]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis-cache:
+    image: redis:8.2.11
+    user: "999:999"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["redis-server", "--bind", "0.0.0.0", "--protected-mode", "no", "--save", "", "--appendonly", "no", "--dir", "/tmp"]
+    tmpfs: ["/tmp:rw,nosuid,nodev,noexec,size=16m"]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  migrate:
+    <<: *backend-base
+    restart: "no"
+    environment:
+      DATABASE_URL_FILE: /run/secrets/migrator_database_url
+      RUNTIME_DATABASE_URL_FILE: /run/secrets/runtime_database_url
+    secrets: [migrator_database_url, runtime_database_url]
+    command: ["sh", "-ec", "python -m alembic upgrade head && python scripts/provision_runtime.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    <<: *backend-base
+    environment: *app-environment
+    secrets: *app-secrets
+    depends_on: *app-dependencies
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  celery-worker:
+    <<: *backend-base
+    environment: *app-environment
+    secrets: *app-secrets
+    depends_on: *app-dependencies
+    command: ["celery", "-A", "app.jobs.worker:celery", "worker", "--loglevel=INFO", "--concurrency=2", "--hostname=worker@%h"]
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.jobs.worker:celery inspect ping --destination worker@$$HOSTNAME --timeout=3 >/dev/null"]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 20s
+
+  celery-beat:
+    <<: *backend-base
+    environment: *app-environment
+    secrets: *app-secrets
+    depends_on: *app-dependencies
+    command: ["celery", "-A", "app.jobs.worker:celery", "beat", "--loglevel=INFO", "--enable-remote-control", "--hostname=beat@%h", "--schedule=/tmp/celerybeat-schedule"]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.jobs.worker:celery inspect ping --destination beat@$$HOSTNAME --timeout=3 >/dev/null"]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 20s
+
+  nginx:
+    image: smart-soc-frontend:pb4
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.frontend
+    user: "101:101"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:rw,nosuid,nodev,noexec,size=32m,uid=101,gid=101,mode=1770"]
+    ports:
+      - "${SOC_BIND_ADDRESS:-127.0.0.1}:${SOC_HTTP_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      edge: {}
+      internal:
+        ipv4_address: 172.30.42.2
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
+
+volumes:
+  postgres-data: {}
+
+secrets:
+  postgres_password:
+    file: ${SOC_POSTGRES_PASSWORD_FILE:-./secrets/dev/postgres_password}
+  migrator_database_url:
+    file: ${SOC_MIGRATOR_DATABASE_URL_FILE:-./secrets/dev/migrator_database_url}
+  runtime_database_url:
+    file: ${SOC_RUNTIME_DATABASE_URL_FILE:-./secrets/dev/runtime_database_url}
+  webhook_secret:
+    file: ${SOC_WEBHOOK_SECRET_FILE:-./secrets/dev/webhook_secret}
+  session_signing_secret:
+    file: ${SOC_SESSION_SIGNING_SECRET_FILE:-./secrets/dev/session_signing_secret}
