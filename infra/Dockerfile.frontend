@@ -8,6 +8,8 @@ RUN npm run build
 FROM nginx:1.30.6-alpine-slim
 COPY --from=frontend-build /frontend/dist/ /usr/share/nginx/html/
 COPY infra/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY infra/nginx/soc-site.conf /etc/nginx/soc-site.conf
+RUN mkdir -p /etc/nginx/tls-enabled
 USER 101:101
 EXPOSE 8080
 ENTRYPOINT ["nginx"]

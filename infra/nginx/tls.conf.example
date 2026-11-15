@@ -1,0 +1,13 @@
+# Operator-provisioned TLS example. Not included by default.
+# Mount this file as /etc/nginx/tls-enabled/tls.conf and mount matching
+# certificate and private-key files at the paths below. Publish 8443 only
+# after securing the deployment. Do not commit keys or certificates.
+server {
+    listen 8443 ssl;
+    server_name _;
+    ssl_certificate /run/secrets/tls_certificate;
+    ssl_certificate_key /run/secrets/tls_private_key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SOC_TLS:10m;
+    include /etc/nginx/soc-site.conf;
+}
