@@ -8,14 +8,19 @@ passed its network-isolated backend and audit steps. The prior PB3 final-head
 local run passed 354 tests. The current sandbox has Node but no Docker, browser,
 Python 3.15 environment or disposable DB/Redis services; local tooling and a
 way to execute the required Compose tests must be established rather than
-skipping them.
+skipping them. A disposable PostgreSQL 18.6 cluster and two Redis 8.2.11
+instances have now been provisioned locally. The first isolated baseline
+reached Ruff successfully but local mypy failed because the locally compiled
+Python lacked the `_sqlite3` standard-library module; Python is being repaired
+and the full baseline must be repeated. This is a toolchain failure, not a
+passing local baseline; the unchanged merge-head GitHub CI remains green.
 
 ## PB4 task list
 
 | Task | Status | Notes |
 |---|---|---|
 | PB4-T01 | Done | Pinned React/Vite/TypeScript/Tailwind toolchain and hash-integrity lock; [DR-034](../adr/DR-034.md). On Node 26.13.1: ESLint, strict TypeScript, Vitest (1 test) and Vite build passed. The first npm audit identified React Router 6 and minimatch advisories; after moving to Router 7 and a scoped tested minimatch override, the repeat found zero vulnerabilities. |
-| PB4-T02 | Pending | Authenticated shell, navigation, RTL/i18n and problem handling. |
+| PB4-T02 | Done | Cookie/CSRF same-origin client, `/auth/me` guards, outage/session-expiry handling, RTL/LTR, English/Arabic shell scaffold, accessible navigation and error boundary; [DR-035](../adr/DR-035.md). Node 26 ESLint, strict TypeScript, build and 7 Vitest tests passed. The first lint run flagged unused boundary parameters and a navigation filename; the first type-check flagged an optional test adapter assignment. Both were corrected before the passing repeat. |
 | PB4-T03 | Pending | Host pages and the owner-authorized minimal missing APIs. |
 | PB4-T04 | Pending | Reusable accessible UI primitives. |
 | PB4-FU01 | Pending | Explicit trusted Nginx proxy and real client IP. |
