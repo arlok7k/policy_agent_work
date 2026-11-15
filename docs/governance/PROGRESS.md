@@ -1,6 +1,49 @@
 # Implementation progress
 
-Current phase: **PB3 — response domain completed locally; final-head CI and PR review pending** (PB4 is out of scope)
+Current phase: **PB4 — frontend shell and infrastructure** (P0 is out of scope).
+PB3 was merged to `main` as `b9d812e4306bf47841d4ee7c9b0a21f95028c98d`; this
+branch starts at that commit. The unchanged main-branch CI run
+[43669756313](https://github.com/arlok7k/policy_agent_work/actions/runs/43669756313)
+passed its network-isolated backend and audit steps. The prior PB3 final-head
+local run passed 354 tests. The current sandbox has Node but no Docker, browser,
+Python 3.15 environment or disposable DB/Redis services; local tooling and a
+way to execute the required Compose tests must be established rather than
+skipping them.
+
+## PB4 task list
+
+| Task | Status | Notes |
+|---|---|---|
+| PB4-T01 | Done | Pinned React/Vite/TypeScript/Tailwind toolchain and hash-integrity lock; [DR-034](../adr/DR-034.md). On Node 26.13.1: ESLint, strict TypeScript, Vitest (1 test) and Vite build passed. The first npm audit identified React Router 6 and minimatch advisories; after moving to Router 7 and a scoped tested minimatch override, the repeat found zero vulnerabilities. |
+| PB4-T02 | Pending | Authenticated shell, navigation, RTL/i18n and problem handling. |
+| PB4-T03 | Pending | Host pages and the owner-authorized minimal missing APIs. |
+| PB4-T04 | Pending | Reusable accessible UI primitives. |
+| PB4-FU01 | Pending | Explicit trusted Nginx proxy and real client IP. |
+| PB4-FU02 | Pending | Explicit development-only HTTP cookie opt-in; production stays Secure. |
+| PB4-T05 | Pending | Compose, internal networks, secrets and health checks. |
+| PB4-T06 | Pending | Nginx proxy, TLS-ready config and security headers. |
+| PB4-T07 | Pending | Preserve backend CI and add frontend/Compose gates. |
+| PB4-T08 | Pending | Real Compose Playwright smoke and security tests. |
+| PB4-T09 | Pending | Operator README, webhook signing, stubs and phase evidence. |
+
+The owner selected **“Add minimal endpoints (recommended)”** for the missing
+settings, command-log and Kill Switch read APIs, preserving existing behavior.
+For settings the owner chose **“Presentation settings (recommended)”**:
+admin-only audited display-name and default-direction changes in a new host-only
+table, with no security-policy changes. For proxy attribution the owner chose
+**“Explicit proxy IP (recommended)”**: only configured proxy addresses are
+trusted and Nginx overwrites forwarded headers. For local cookies the owner chose
+**“Explicit dev-only opt-in (recommended)”**: separate non-Secure cookie names
+only with `ENV=development` and an explicit flag; production rejects the flag.
+The selected visual direction is **“Dark SOC console (recommended)”**. For
+clean-checkout secrets the owner chose **“Development bootstrap (recommended)”**:
+an explicit development-only command will create ignored throwaway random files;
+production secrets remain operator-provisioned. Exact choices and their
+consequences will be recorded in the relevant task DRs.
+
+## PB3 completion record
+
+Current historical phase status: **PB3 — merged**.
 
 PB2 was merged into `main` at `e11c1f0`. Before PB3 and its requested webhook
 follow-up, the CI-equivalent isolated baseline passed **235 tests**, Ruff,

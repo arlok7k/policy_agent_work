@@ -14,3 +14,8 @@ node_modules/
 frontend/dist/
 infra/secrets/*
 !infra/secrets/README.md
+
+# Disposable local tools and test/build outputs
+.cache/
+frontend/playwright-report/
+frontend/test-results/
