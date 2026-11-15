@@ -66,3 +66,46 @@ def test_ci_refuses_non_test_database_and_duplicate_services(
     args.cache_port = args.broker_port
     with pytest.raises(ValueError, match="distinct"):
         asyncio.run(ci_isolated_checks._run(args))
+
+
+def test_bridge_tasks_are_kept_alive_and_cancelled_before_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        entered = asyncio.Event()
+        finished = asyncio.Event()
+
+        async def relay(reader: object, writer: object, *, port: int) -> None:
+            try:
+                entered.set()
+                await asyncio.Event().wait()
+            finally:
+                finished.set()
+
+        monkeypatch.setattr(ci_isolated_checks, "_relay", relay)
+        tracker = ci_isolated_checks._RelayTracker()
+        tracker.accept(None, None, port=1)  # type: ignore[arg-type]
+        await entered.wait()
+        assert len(tracker.tasks) == 1
+        await tracker.close()
+        assert finished.is_set() and not tracker.tasks
+
+    asyncio.run(exercise())
+
+
+def test_unexpected_bridge_failure_is_reported_without_exception_contents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        async def relay(reader: object, writer: object, *, port: int) -> None:
+            raise ValueError("untrusted diagnostic text")
+
+        monkeypatch.setattr(ci_isolated_checks, "_relay", relay)
+        tracker = ci_isolated_checks._RelayTracker()
+        tracker.accept(None, None, port=1)  # type: ignore[arg-type]
+        await asyncio.sleep(0)
+        with pytest.raises(RuntimeError, match="Test service bridge failed") as error:
+            await tracker.close()
+        assert "untrusted diagnostic text" not in str(error.value)
+
+    asyncio.run(exercise())

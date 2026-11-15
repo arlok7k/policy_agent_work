@@ -1,4 +1,4 @@
-name: PB2 backend checks
+name: PB4 baseline checks
 
 on:
   pull_request:
@@ -55,3 +55,53 @@ jobs:
         run: python scripts/ci_isolated_checks.py
       - name: Dependency, license, and secret scans
         run: make audit PYTHON=python
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '26.13.1'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend lint, type-check, tests and build
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+          npm audit --audit-level=low
+
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ENV: development
+      DEV_INSECURE_COOKIES: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Generate throwaway development secrets
+        run: python3 scripts/bootstrap_dev_secrets.py
+      - name: Validate Compose configuration
+        run: docker compose -f infra/docker-compose.yml config --quiet
+      - name: Build and start the full stack
+        run: docker compose -f infra/docker-compose.yml up --build --wait --wait-timeout 300
+      - name: Check proxy configuration and health
+        run: |
+          docker compose -f infra/docker-compose.yml exec -T nginx nginx -t
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/health
+          echo
+          docker compose -f infra/docker-compose.yml ps -a
+      - name: Redacted service diagnostics
+        if: failure()
+        run: |
+          docker compose -f infra/docker-compose.yml ps -a
+          docker compose -f infra/docker-compose.yml logs --no-color --tail=120 2>&1 | python3 scripts/redact_compose_logs.py
+      - name: Stop disposable stack
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down --volumes --remove-orphans
