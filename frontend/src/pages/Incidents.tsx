@@ -9,7 +9,7 @@ import type { Problem } from '../api/problem';
 import type { CursorPage, Evidence, Incident } from '../api/types';
 import { useCursor } from '../api/useCursor';
 import { useGet } from '../api/useGet';
-import { Badge, DataState, Empty, PageHeader, Pagination, ProblemNotice } from '../components/PageCommon';
+import { Badge, DataState, Empty, PageHeader, Table, Pagination, ProblemNotice } from '../components/PageCommon';
 
 export function Incidents() {
   const cursor = useCursor();
@@ -33,10 +33,10 @@ export function Incidents() {
         <div className="form-actions"><button className="button button-primary" disabled={busy}>{busy ? 'Creating…' : 'Create incident'}</button><button className="button" type="button" onClick={() => setShowForm(false)}>Cancel</button></div></form></section>}
     <section className="panel"><div className="panel-heading"><div><h2>Incident queue</h2><p>Newest investigations first</p></div><button className="button button-quiet" onClick={incidents.reload}><RefreshCw size={14} /> Refresh</button></div>
       <DataState state={incidents.state} retry={incidents.reload}>{(page) => <>
-        {page.items.length === 0 ? <Empty>No incidents yet. Investigate an alert or create an incident.</Empty> : <div className="table-wrap"><table><thead><tr><th>Incident</th><th>Status</th><th>Linked alerts</th><th>Created</th><th>Updated</th><th><span className="sr-only">Details</span></th></tr></thead>
+        {page.items.length === 0 ? <Empty>No incidents yet. Investigate an alert or create an incident.</Empty> : <Table caption="Incidents"><thead><tr><th>Incident</th><th>Status</th><th>Linked alerts</th><th>Created</th><th>Updated</th><th><span className="sr-only">Details</span></th></tr></thead>
           <tbody>{page.items.map((item) => <tr key={item.id}><td><Link className="table-link" to={`/incidents/${encodeURIComponent(item.id)}`}>{item.title}</Link><small className="cell-sub">#{shortId(item.id)}</small></td>
             <td><Badge value={item.status} /></td><td>{item.alert_ids.length}</td><td>{formatDate(item.created_at)}</td><td>{formatDate(item.updated_at)}</td>
-            <td><Link className="link-action" aria-label={`View incident ${item.title}`} to={`/incidents/${encodeURIComponent(item.id)}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></table></div>}
+            <td><Link className="link-action" aria-label={`View incident ${item.title}`} to={`/incidents/${encodeURIComponent(item.id)}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></Table>}
         <Pagination canPrevious={cursor.canPrevious} canNext={page.next_cursor !== null} previous={cursor.previous} next={() => { if (page.next_cursor) cursor.next(page.next_cursor); }} label="Incident pages" />
       </>}</DataState></section></div>;
 }

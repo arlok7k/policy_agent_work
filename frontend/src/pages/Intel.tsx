@@ -6,7 +6,7 @@ import { mapProblem } from '../api/problem';
 import type { Problem } from '../api/problem';
 import type { CacheStats, IntelResult } from '../api/types';
 import { useGet } from '../api/useGet';
-import { Badge, DataState, Empty, PageHeader, ProblemNotice } from '../components/PageCommon';
+import { Badge, DataState, Empty, PageHeader, Table, ProblemNotice } from '../components/PageCommon';
 
 export function Intel({ bulk = false }: { bulk?: boolean }) {
   const stats = useGet<CacheStats>('/threat-intel/cache/stats');
@@ -39,8 +39,8 @@ export function Intel({ bulk = false }: { bulk?: boolean }) {
       <section className="panel"><div className="panel-heading"><div><h2>Cache status</h2><p>Host cache health and entry counts</p></div></div>
         <DataState state={stats.state} retry={stats.reload}>{(data) => <dl className="detail-list"><div><dt>Fresh entries</dt><dd>{data.fresh}</dd></div><div><dt>Expired entries</dt><dd>{data.expired}</dd></div><div><dt>Redis cache</dt><dd><Badge value={data.redis_available ? 'active' : 'warning'} /></dd></div></dl>}</DataState></section></div>
     <section className="panel"><div className="panel-heading"><div><h2>Results</h2><p>Mock and degraded results are explicitly labelled</p></div></div>
-      {results === null || results.length === 0 ? <Empty>No results yet.</Empty> : <div className="table-wrap"><table><thead><tr><th>Indicator</th><th>Verdict</th><th>Score</th><th>Sources</th><th>Provider</th></tr></thead><tbody>{results.map((item, index) => <tr key={`${item.indicator}-${index}`}>
-        <td dir="ltr">{item.indicator}</td><td><Badge value={item.verdict} /></td><td>{item.score ?? '—'}</td><td>{item.sources.join(', ') || '—'}</td><td>{item.mock ? 'Mock' : 'Not mock'}{item.degraded ? ' · degraded' : ''}</td></tr>)}</tbody></table></div>}
+      {results === null || results.length === 0 ? <Empty>No results yet.</Empty> : <Table caption="Intelligence results"><thead><tr><th>Indicator</th><th>Verdict</th><th>Score</th><th>Sources</th><th>Provider</th></tr></thead><tbody>{results.map((item, index) => <tr key={`${item.indicator}-${index}`}>
+        <td dir="ltr">{item.indicator}</td><td><Badge value={item.verdict} /></td><td>{item.score ?? '—'}</td><td>{item.sources.join(', ') || '—'}</td><td>{item.mock ? 'Mock' : 'Not mock'}{item.degraded ? ' · degraded' : ''}</td></tr>)}</tbody></Table>}
     </section>
   </div>;
 }

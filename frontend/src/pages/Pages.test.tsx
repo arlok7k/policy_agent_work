@@ -64,7 +64,7 @@ describe('API-backed host pages', () => {
   it('requires confirmation before a senior analyst sends an approval', async () => {
     setup(senior); vi.mocked(api.post).mockResolvedValue({ data: action }); mount('/response');
     fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
-    expect(screen.getByRole('group', { name: 'Confirm response action' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Approve isolate host?' })).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm approve' }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/response/actions/action-1/approve', {}));

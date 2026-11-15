@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { I18nProvider } from '../i18n/I18nProvider';
+import { ToastProvider } from '../components/ui/Primitives';
 import { Login } from '../pages/Login';
 import { Dashboard } from '../pages/Dashboard';
 import { AlertDetail, Alerts } from '../pages/Alerts';
@@ -16,7 +17,7 @@ import { RequireAuth } from './RequireAuth';
 import { Shell } from './Shell';
 
 export function App() {
-  return <ErrorBoundary><I18nProvider><AuthProvider><PresentationProvider><Routes>
+  return <ErrorBoundary><I18nProvider><AuthProvider><PresentationProvider><ToastProvider><Routes>
     <Route path="/login" element={<Login />} />
     <Route element={<RequireAuth />}><Route element={<Shell />}>
       <Route path="/" element={<Dashboard />} />
@@ -36,5 +37,5 @@ export function App() {
       <Route path="/policies" element={<Placeholder title="policies" policy />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route></Route>
-  </Routes></PresentationProvider></AuthProvider></I18nProvider></ErrorBoundary>;
+  </Routes></ToastProvider></PresentationProvider></AuthProvider></I18nProvider></ErrorBoundary>;
 }

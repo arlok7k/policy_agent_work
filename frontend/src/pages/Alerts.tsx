@@ -8,7 +8,7 @@ import type { Problem } from '../api/problem';
 import type { Alert, CursorPage, Investigation } from '../api/types';
 import { useCursor } from '../api/useCursor';
 import { useGet } from '../api/useGet';
-import { Badge, DataState, Empty, PageHeader, Pagination, ProblemNotice } from '../components/PageCommon';
+import { Badge, DataState, Empty, PageHeader, Table, Pagination, ProblemNotice } from '../components/PageCommon';
 
 export function Alerts() {
   const [severity, setSeverity] = useState('');
@@ -23,10 +23,10 @@ export function Alerts() {
       <label className="filter-label">Severity <select value={severity} onChange={(event) => { setSeverity(event.target.value); cursor.reset(); }}>
         <option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label></div>
       <DataState state={alerts.state} retry={alerts.reload}>{(page) => <>
-        {page.items.length === 0 ? <Empty>No alerts match this view.</Empty> : <div className="table-wrap"><table><thead><tr><th>Rule / ID</th><th>Source</th><th>Severity</th><th>Agent</th><th>Source IP</th><th>Status</th><th>Received</th><th><span className="sr-only">Details</span></th></tr></thead>
+        {page.items.length === 0 ? <Empty>No alerts match this view.</Empty> : <Table caption="Alert feed"><thead><tr><th>Rule / ID</th><th>Source</th><th>Severity</th><th>Agent</th><th>Source IP</th><th>Status</th><th>Received</th><th><span className="sr-only">Details</span></th></tr></thead>
           <tbody>{page.items.map((alert) => <tr key={alert.id}><td><Link className="table-link" to={`/alerts/${encodeURIComponent(alert.id)}`}>{alert.rule_id}</Link><small className="cell-sub">#{shortId(alert.id)}</small></td>
             <td>{alert.source}</td><td><Badge value={alert.severity} /></td><td>{alert.agent ?? '—'}</td><td><span dir="ltr">{alert.src_ip ?? '—'}</span></td><td><Badge value={alert.status} /></td><td>{formatDate(alert.created_at)}</td>
-            <td><Link className="link-action" aria-label={`View alert ${alert.rule_id}`} to={`/alerts/${encodeURIComponent(alert.id)}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></table></div>}
+            <td><Link className="link-action" aria-label={`View alert ${alert.rule_id}`} to={`/alerts/${encodeURIComponent(alert.id)}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></Table>}
         <Pagination canPrevious={cursor.canPrevious} canNext={page.next_cursor !== null} previous={cursor.previous} next={() => { if (page.next_cursor) cursor.next(page.next_cursor); }} label="Alert pages" />
       </>}</DataState>
     </section></div>;

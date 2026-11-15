@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Alert, AlertSummary, CursorPage } from '../api/types';
 import { useGet } from '../api/useGet';
-import { Badge, DataState, Empty, PageHeader } from '../components/PageCommon';
+import { Badge, DataState, Empty, PageHeader, Table } from '../components/PageCommon';
 
 export function Dashboard() {
   const summary = useGet<AlertSummary>('/alerts/stats/summary');
@@ -46,10 +46,10 @@ export function Dashboard() {
     }}</DataState>
     <section className="panel latest-panel"><div className="panel-heading"><div><h2>Recent alerts</h2><p>Latest alerts from the host API</p></div><Link className="link-action" to="/alerts">All alerts <ArrowUpRight size={14} /></Link></div>
       <DataState state={alerts.state} retry={alerts.reload}>{(page) => page.items.length === 0 ? <Empty>No alerts have been received yet.</Empty> :
-        <div className="table-wrap"><table><thead><tr><th>Alert</th><th>Source</th><th>Severity</th><th>Status</th><th>Received</th><th><span className="sr-only">Details</span></th></tr></thead>
+        <Table caption="Recent alerts"><thead><tr><th>Alert</th><th>Source</th><th>Severity</th><th>Status</th><th>Received</th><th><span className="sr-only">Details</span></th></tr></thead>
           <tbody>{page.items.slice(0, 6).map((alert) => <tr key={alert.id}><td><Link className="table-link" to={`/alerts/${encodeURIComponent(alert.id)}`}>{alert.rule_id}</Link><small className="cell-sub">#{shortId(alert.id)}</small></td>
             <td>{alert.source}</td><td><Badge value={alert.severity} /></td><td><Badge value={alert.status} /></td><td>{formatDate(alert.created_at)}</td>
-            <td><Link className="link-action" aria-label={`View alert ${alert.rule_id}`} to={`/alerts/${encodeURIComponent(alert.id)}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></table></div>}
+            <td><Link className="link-action" aria-label={`View alert ${alert.rule_id}`} to={`/alerts/${encodeURIComponent(alert.id)}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></Table>}
       </DataState>
     </section>
   </div>;

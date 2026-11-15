@@ -8,7 +8,7 @@ import type { Problem } from '../api/problem';
 import type { User, UserPage } from '../api/types';
 import { useGet } from '../api/useGet';
 import { useAuth } from '../app/auth-context';
-import { Badge, DataState, Empty, PageHeader, Pagination, ProblemNotice } from '../components/PageCommon';
+import { Badge, DataState, Empty, PageHeader, Table, Pagination, ProblemNotice } from '../components/PageCommon';
 
 const roles = ['analyst', 'senior_analyst', 'admin'];
 export function UsersPage() {
@@ -46,8 +46,8 @@ export function UsersPage() {
           {editing && <label className="checkbox-label"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /> Account active</label>}
           <div className="form-actions"><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save user' : 'Create user'}</button><button className="button" type="button" onClick={() => { setShowForm(false); setPassword(''); }}>Cancel</button></div></form></section>}
       <section className="panel"><div className="panel-heading"><div><h2>User directory</h2><p>Legacy roles are enforced by the backend</p></div></div><DataState state={users.state} retry={users.reload}>{(page) => <>
-        {page.items.length === 0 ? <Empty>No users on this page.</Empty> : <div className="table-wrap"><table><thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Controls</th></tr></thead><tbody>{page.items.map((user) => <tr key={user.id}>
-          <td><strong>{user.username}</strong></td><td>{user.role.replaceAll('_', ' ')}</td><td><Badge value={user.is_active ? 'active' : 'inactive'} /></td><td>{formatDate(user.created_at)}</td><td><button className="link-action" onClick={() => editForm(user)}>Edit<span className="sr-only"> {user.username}</span></button></td></tr>)}</tbody></table></div>}
+        {page.items.length === 0 ? <Empty>No users on this page.</Empty> : <Table caption="User directory"><thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Controls</th></tr></thead><tbody>{page.items.map((user) => <tr key={user.id}>
+          <td><strong>{user.username}</strong></td><td>{user.role.replaceAll('_', ' ')}</td><td><Badge value={user.is_active ? 'active' : 'inactive'} /></td><td>{formatDate(user.created_at)}</td><td><button className="link-action" onClick={() => editForm(user)}>Edit<span className="sr-only"> {user.username}</span></button></td></tr>)}</tbody></Table>}
         <Pagination canPrevious={offset > 0} canNext={page.items.length === page.limit} previous={() => setOffset(Math.max(0, offset - page.limit))} next={() => setOffset(offset + page.limit)} label="User pages" />
       </>}</DataState></section>
     </>}</div>;

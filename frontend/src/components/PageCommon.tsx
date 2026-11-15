@@ -18,18 +18,5 @@ export function DataState<T>({ state, children, retry }: { state: Loadable<T>; c
   if (state.status === 'error') return <div><ProblemNotice problem={state.problem} />{retry && <button className="button button-quiet mt-3" onClick={retry}><RefreshCw size={14} /> Retry</button>}</div>;
   return <>{children(state.data)}</>;
 }
-export function Badge({ value }: { value: string }) {
-  const normalized = value.toLowerCase();
-  const tone = ['critical', 'high', 'failed', 'rejected', 'engaged'].includes(normalized) ? 'danger'
-    : ['medium', 'pending_approval', 'paused', 'warning'].includes(normalized) ? 'warning'
-    : ['low', 'executed', 'open', 'active', 'disengaged', 'resolved'].includes(normalized) ? 'success'
-    : 'neutral';
-  return <span className={`badge badge-${tone}`}><span className="badge-dot" />{value.replaceAll('_', ' ')}</span>;
-}
-export function Pagination({ canPrevious, canNext, previous, next, label = 'Pagination' }: {
-  canPrevious: boolean; canNext: boolean; previous: () => void; next: () => void; label?: string;
-}) {
-  return <nav className="pagination" aria-label={label}><button className="button button-quiet" disabled={!canPrevious} onClick={previous}>Previous</button>
-    <button className="button button-quiet" disabled={!canNext} onClick={next}>Next</button></nav>;
-}
+export { Badge, Pagination, Table } from './ui/Primitives';
 export function Empty({ children }: { children: ReactNode }) { return <div className="empty-state">{children}</div>; }

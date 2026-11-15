@@ -10,7 +10,8 @@ import type { Action, CatalogItem, CommandPage, CursorPage, SwitchState } from '
 import { useCursor } from '../api/useCursor';
 import { useGet } from '../api/useGet';
 import { useAuth } from '../app/auth-context';
-import { Badge, DataState, Empty, PageHeader, Pagination, ProblemNotice } from '../components/PageCommon';
+import { Dialog } from '../components/ui/Primitives';
+import { Badge, DataState, Empty, PageHeader, Table, Pagination, ProblemNotice } from '../components/PageCommon';
 
 type Decision = { action: Action; operation: 'approve' | 'reject' | 'rollback' };
 export function ResponsePage() {
@@ -105,29 +106,29 @@ export function ResponsePage() {
           <p className="panel-footnote">The switch pauses automated response and TTL rollback. Human-approved work may continue.</p>
           {canOperate && !switchConfirm && <button className={`button ${current.engaged ? '' : 'button-danger'}`} onClick={() => setSwitchConfirm(true)}>{current.engaged ? 'Disengage Kill Switch' : 'Engage Kill Switch'}</button>}
           {!canOperate && <p className="form-hint">Only a senior analyst or admin can change this control.</p>}
-          {switchConfirm && <div className="confirmation" role="group" aria-label="Confirm Kill Switch change"><strong>{current.engaged ? 'Resume automation?' : 'Pause automation?'}</strong>
+          {switchConfirm && <Dialog open title={current.engaged ? 'Resume automation?' : 'Pause automation?'} onClose={() => setSwitchConfirm(false)}>
             <p>{current.engaged ? 'Queued automated work may resume.' : 'Automated response and TTL rollback will pause; human-approved execution may continue.'}</p>
-            <div className="form-actions"><button className="button button-danger" disabled={busy} onClick={() => void toggleSwitch(current.engaged)}>Confirm {current.engaged ? 'disengage' : 'engage'}</button><button className="button" onClick={() => setSwitchConfirm(false)}>Cancel</button></div></div>}
+            <div className="form-actions"><button className="button button-danger" disabled={busy} onClick={() => void toggleSwitch(current.engaged)}>Confirm {current.engaged ? 'disengage' : 'engage'}</button><button className="button" onClick={() => setSwitchConfirm(false)}>Cancel</button></div></Dialog>}
         </>}</DataState>
       </section>
     </div>
-    {decision && <div className="confirmation decision-confirm" role="group" aria-label="Confirm response action"><strong>{decision.operation === 'approve' ? 'Approve' : decision.operation === 'reject' ? 'Reject' : 'Request rollback for'} {decision.action.action_type.replaceAll('_', ' ')}?</strong>
+    {decision && <Dialog open title={`${decision.operation === 'approve' ? 'Approve' : decision.operation === 'reject' ? 'Reject' : 'Request rollback for'} ${decision.action.action_type.replaceAll('_', ' ')}?`} onClose={() => setDecision(null)}>
       <p>{decision.operation === 'approve' ? 'This records your decision and queues a simulated command. Server safeguards and Four-Eyes still apply.' : decision.operation === 'rollback' ? 'This queues a simulated reversal, subject to safety checks.' : 'This records a rejection; the pending action will not execute.'}</p>
-      <div className="form-actions"><button className="button button-primary" disabled={busy} onClick={() => void decide()}>Confirm {decision.operation}</button><button className="button" onClick={() => setDecision(null)}>Cancel</button></div></div>}
+      <div className="form-actions"><button className="button button-primary" disabled={busy} onClick={() => void decide()}>Confirm {decision.operation}</button><button className="button" onClick={() => setDecision(null)}>Cancel</button></div></Dialog>}
     <section className="panel"><div className="panel-heading"><div><h2>Approval queue &amp; actions</h2><p>Actions on this page; pending approvals require a different eligible user</p></div><AlertTriangle size={18} className="text-amber-300" /></div>
       <DataState state={actions.state} retry={actions.reload}>{(page) => <>
-        {page.items.length === 0 ? <Empty>No response requests yet.</Empty> : <div className="table-wrap"><table><thead><tr><th>Action</th><th>Incident</th><th>Level</th><th>Target</th><th>Status</th><th>Requested</th><th>Controls</th></tr></thead>
+        {page.items.length === 0 ? <Empty>No response requests yet.</Empty> : <Table caption="Response activity"><thead><tr><th>Action</th><th>Incident</th><th>Level</th><th>Target</th><th>Status</th><th>Requested</th><th>Controls</th></tr></thead>
           <tbody>{page.items.map((action) => <tr key={action.id}><td><strong>{action.action_type.replaceAll('_', ' ')}</strong><small className="cell-sub">#{shortId(action.id)}</small></td>
             <td><Link className="table-link" to={`/incidents/${encodeURIComponent(action.incident_id)}`}>#{shortId(action.incident_id)}</Link></td><td>L{action.level}</td><td><span dir="ltr">{JSON.stringify(action.target)}</span></td><td><Badge value={action.status} />{action.rollback_request_status && <small className="cell-sub">Rollback: {action.rollback_request_status}</small>}</td><td>{formatDate(action.created_at)}</td>
             <td><div className="table-actions">{canOperate && action.status === 'pending_approval' && action.requested_by !== principal?.id && <><button className="link-action" onClick={() => setDecision({ action, operation: 'approve' })}>Approve</button><button className="link-action" onClick={() => setDecision({ action, operation: 'reject' })}>Reject</button></>}
-              {canOperate && action.status === 'executed' && action.rollback_request_status !== 'pending' && catalog.state.status === 'ready' && catalog.state.data.items.some((item) => item.action_type === action.action_type && item.reversible) && <button className="link-action" onClick={() => setDecision({ action, operation: 'rollback' })}>Rollback</button>}</div></td></tr>)}</tbody></table></div>}
+              {canOperate && action.status === 'executed' && action.rollback_request_status !== 'pending' && catalog.state.status === 'ready' && catalog.state.data.items.some((item) => item.action_type === action.action_type && item.reversible) && <button className="link-action" onClick={() => setDecision({ action, operation: 'rollback' })}>Rollback</button>}</div></td></tr>)}</tbody></Table>}
         <Pagination canPrevious={cursor.canPrevious} canNext={page.next_cursor !== null} previous={cursor.previous} next={() => { if (page.next_cursor) cursor.next(page.next_cursor); }} label="Response action pages" />
       </>}</DataState>
     </section>
     <section className="panel"><div className="panel-heading"><div><h2>Executed-command log</h2><p>Actual connector records, not queued action statuses</p></div><span className="subtle-pill">APPEND ONLY</span></div>
       <DataState state={commands.state} retry={commands.reload}>{(page) => <>
-        {page.items.length === 0 ? <Empty>No commands have executed yet.</Empty> : <div className="table-wrap"><table><thead><tr><th>Command</th><th>Phase</th><th>Target</th><th>Connector</th><th>Mode</th><th>Executed</th></tr></thead>
-          <tbody>{page.items.map((command) => <tr key={command.id}><td><strong>{command.command}</strong><small className="cell-sub">Action #{shortId(command.action_id)}</small></td><td>{command.phase}</td><td><span dir="ltr">{JSON.stringify(command.target)}</span></td><td>{command.connector}</td><td>{command.simulated ? 'Simulated' : 'Recorded'}</td><td>{formatDate(command.executed_at)}</td></tr>)}</tbody></table></div>}
+        {page.items.length === 0 ? <Empty>No commands have executed yet.</Empty> : <Table caption="Executed-command log"><thead><tr><th>Command</th><th>Phase</th><th>Target</th><th>Connector</th><th>Mode</th><th>Executed</th></tr></thead>
+          <tbody>{page.items.map((command) => <tr key={command.id}><td><strong>{command.command}</strong><small className="cell-sub">Action #{shortId(command.action_id)}</small></td><td>{command.phase}</td><td><span dir="ltr">{JSON.stringify(command.target)}</span></td><td>{command.connector}</td><td>{command.simulated ? 'Simulated' : 'Recorded'}</td><td>{formatDate(command.executed_at)}</td></tr>)}</tbody></Table>}
         <Pagination canPrevious={commandHistory.length > 0} canNext={page.next_before_id !== null} previous={() => setCommandHistory((items) => items.slice(0, -1))}
           next={() => { if (page.next_before_id !== null) setCommandHistory((items) => [...items, page.next_before_id as number]); }} label="Command log pages" />
       </>}</DataState>
