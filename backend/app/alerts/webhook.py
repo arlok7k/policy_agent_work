@@ -115,7 +115,7 @@ async def accept_webhook(request: Request, response: Response) -> WebhookAccepte
             ex=2 * settings.webhook_max_clock_skew_seconds + 1,
         )
     except RedisError:
-        raise Unavailable() from None
+        raise Unavailable(retry_after=settings.webhook_retry_after_seconds) from None
     if not reserved:
         raise Conflict()
 
@@ -133,6 +133,6 @@ async def accept_webhook(request: Request, response: Response) -> WebhookAccepte
         )
     except KombuError, RedisError, OSError:
         # Do not release the reservation: publication may have succeeded.
-        raise Unavailable() from None
+        raise Unavailable(retry_after=settings.webhook_retry_after_seconds) from None
     response.headers["Cache-Control"] = "no-store"
     return WebhookAccepted(accepted=True)

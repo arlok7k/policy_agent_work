@@ -31,7 +31,11 @@ def test_export_is_reproducible_valid_and_matches_authentication_boundaries() ->
     assert "HTTPValidationError" not in schemas
     for case in ROLE_ROUTES:
         operation = document["paths"][case.path][case.method.lower()]
-        expected = {"admin"} if case.access == "admin" else {"analyst", "senior_analyst", "admin"}
+        expected = {
+            "admin": {"admin"},
+            "senior": {"senior_analyst", "admin"},
+            "all": {"analyst", "senior_analyst", "admin"},
+        }[case.access]
         assert set(operation["x-legacy-roles"]) == expected
         if case.method == "GET":
             assert operation["security"] == [{"SessionCookie": []}]
@@ -51,9 +55,13 @@ def test_export_is_reproducible_valid_and_matches_authentication_boundaries() ->
     ]
     assert document["paths"]["/api/health"]["get"]["security"] == []
     assert document["paths"]["/api/auth/login"]["post"]["security"] == []
-    assert document["paths"]["/api/alerts/webhook"]["post"]["security"] == [
+    webhook = document["paths"]["/api/alerts/webhook"]["post"]
+    assert webhook["security"] == [
         {"WebhookTimestamp": [], "WebhookEventId": [], "WebhookSignature": []}
     ]
+    retry = webhook["responses"]["503"]["headers"]["Retry-After"]
+    assert retry["required"] is True
+    assert retry["schema"] == {"type": "integer", "minimum": 1}
 
 
 def test_representative_error_statuses_match_published_schemas(
@@ -104,6 +112,7 @@ def test_representative_error_statuses_match_published_schemas(
             "/api/threat-intel/check-ip", headers=headers, json={"indicator": "8.8.4.4"}
         )
     assert response.status_code == 503
+    assert "Retry-After" not in response.headers
     assert_response_contract("POST", "/api/threat-intel/check-ip", response, *protected)
 
     marker = Redacted.random()

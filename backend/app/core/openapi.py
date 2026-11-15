@@ -1,4 +1,4 @@
-"""Accurate, versioned PB1/PB2 host OpenAPI security and error contracts."""
+"""Accurate, versioned host OpenAPI security and error contracts."""
 
 from http import HTTPStatus
 from typing import Any
@@ -19,6 +19,13 @@ _ROLE_OPERATIONS: dict[tuple[str, str], str] = {
     ("post", "/api/incidents"): "incidents_write",
     ("get", "/api/incidents/{incident_id}"): "incidents_read",
     ("get", "/api/incidents/{incident_id}/evidence"): "incidents_read",
+    ("get", "/api/response/catalog"): "response_read",
+    ("get", "/api/response/actions"): "response_read",
+    ("post", "/api/response/actions"): "response_request",
+    ("post", "/api/response/actions/{action_id}/approve"): "response_decide",
+    ("post", "/api/response/actions/{action_id}/reject"): "response_decide",
+    ("post", "/api/response/actions/{action_id}/rollback"): "response_rollback",
+    ("post", "/api/response/kill-switch"): "response_kill_switch",
     ("post", "/api/threat-intel/check-ip"): "threat_intel",
     ("post", "/api/threat-intel/bulk-check"): "threat_intel",
     ("get", "/api/threat-intel/cache/stats"): "threat_intel",
@@ -48,6 +55,13 @@ _ERRORS: dict[tuple[str, str], tuple[int, ...]] = {
     ("post", "/api/incidents"): (*_COMMON, 404, 422),
     ("get", "/api/incidents/{incident_id}"): (*_COMMON, 404),
     ("get", "/api/incidents/{incident_id}/evidence"): (*_COMMON, 404, 422),
+    ("get", "/api/response/catalog"): (401, 403, 500, 503),
+    ("get", "/api/response/actions"): (*_COMMON, 422),
+    ("post", "/api/response/actions"): (*_COMMON, 404, 409, 422),
+    ("post", "/api/response/actions/{action_id}/approve"): (*_COMMON, 404, 409),
+    ("post", "/api/response/actions/{action_id}/reject"): (*_COMMON, 404, 409),
+    ("post", "/api/response/actions/{action_id}/rollback"): (*_COMMON, 404, 409, 422),
+    ("post", "/api/response/kill-switch"): _COMMON,
     ("post", "/api/threat-intel/check-ip"): _COMMON,
     ("post", "/api/threat-intel/bulk-check"): (*_COMMON, 422),
     ("get", "/api/threat-intel/cache/stats"): (401, 403, 500, 503),
@@ -93,6 +107,34 @@ _DESCRIPTIONS: dict[tuple[str, str], str] = {
     ),
     ("post", "/api/threat-intel/bulk-check"): (
         "Only deterministic mock results are available; THREAT_INTEL_BULK_MAX_ITEMS bounds input."
+    ),
+    ("get", "/api/response/actions"): (
+        "All active legacy roles share visibility. Supports incident filtering and bounded "
+        "descending timestamp/UUID cursor pagination."
+    ),
+    ("post", "/api/response/actions"): (
+        "Requires an existing incident and catalog-defined target/parameters. L2 requires an "
+        "explicit automatic or manual mode and a bounded TTL. An optional Idempotency-Key "
+        "replays the same request for the same user; mismatched reuse is a conflict. "
+        "Actions are committed before best-effort dispatch and executed only by Celery."
+    ),
+    ("post", "/api/response/actions/{action_id}/approve"): (
+        "A different active senior analyst or admin approves; execution is asynchronous."
+    ),
+    ("post", "/api/response/actions/{action_id}/reject"): (
+        "An active senior analyst or admin rejects a pending manual decision."
+    ),
+    ("post", "/api/response/actions/{action_id}/rollback"): (
+        "Records an authorized human rollback request; execution is asynchronous and "
+        "remains possible while automation is halted."
+    ),
+    ("post", "/api/response/kill-switch"): (
+        "Engage or disengage automation, auditing every authorized request. "
+        "Human-approved execution remains possible; queued automation and TTL jobs pause."
+    ),
+    ("get", "/api/response/catalog"): (
+        "Action levels, strict target/parameter schemas and simulated connector behavior. "
+        "Release host is a rollback-only operation; independently requested L2 actions need TTL."
     ),
 }
 
@@ -175,6 +217,14 @@ class HostFastAPI(FastAPI):
                             }
                         },
                     }
+                    if key == ("post", "/api/alerts/webhook") and code == 503:
+                        responses[str(code)]["headers"] = {
+                            "Retry-After": {
+                                "description": "Configured retry hint in seconds; not a guarantee.",
+                                "required": True,
+                                "schema": {"type": "integer", "minimum": 1},
+                            }
+                        }
                 operation["security"] = _security(method, path)
                 if key in _ROLE_OPERATIONS:
                     name = _ROLE_OPERATIONS[key]

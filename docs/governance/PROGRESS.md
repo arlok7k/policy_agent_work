@@ -1,6 +1,82 @@
 # Implementation progress
 
-Current phase: **PB2 — alerts, incidents, evidence, threat-intel and AI adapters**
+Current phase: **PB3 — response domain completed locally; final-head CI and PR review pending** (PB4 is out of scope)
+
+PB2 was merged into `main` at `e11c1f0`. Before PB3 and its requested webhook
+follow-up, the CI-equivalent isolated baseline passed **235 tests**, Ruff,
+formatting, mypy and OpenAPI drift checking against disposable services.
+
+## PB3 task list
+
+| Task | Status | Notes |
+|---|---|---|
+| PB2-FIX01 | Done | Redis/publication 503 `Retry-After` follow-up; [DR-024](../adr/DR-024.md). The isolated affected suite passed 48 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T01 | Done | Migrations 006–008, immutable requests, decision/log constraints, singleton and runtime grants; [DR-025](../adr/DR-025.md). Full isolated `make check` passed 253 tests before a rollback-recovery refinement; its affected isolated suite then passed 31 tests. |
+| PB3-T02 | Done | Immutable action catalog, strict parameter/target schemas, role-protected route and OpenAPI; [DR-026](../adr/DR-026.md). The affected isolated suite passed 8 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T03 | Done | Pure evaluator, additive rules and serialized safety snapshots; [DR-027](../adr/DR-027.md). The affected isolated suite passed 58 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T04 | Done | Transactional, audited approval state machine with live-role checks, self-approval denial and race protection; [DR-028](../adr/DR-028.md). The affected isolated suite passed 27 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T05 | Done | Simulation-only structured connectors and socket-level no-network test; [DR-029](../adr/DR-029.md). The affected isolated suite passed 61 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T06 | Done | Celery execution, live approval/safeguard/switch revalidation and bounded Beat recovery; [DR-030](../adr/DR-030.md). The affected isolated suite passed 44 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T07 | Done | Configurable mandatory L2 TTL, bounded Beat rollback, switch/safeguard rechecks and frozen-clock boundary tests; [DR-031](../adr/DR-031.md). The affected isolated suite passed 32 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T08 | Done | Audited, senior/admin automation-only Kill Switch with real running-worker propagation; [DR-032](../adr/DR-032.md). The affected isolated suite passed 26 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T09 | Done | Response action/decision/rollback/list APIs, optional idempotency and durable manual rollback recovery; [DR-033](../adr/DR-033.md). The affected isolated suite passed 47 tests; Ruff, format, mypy and OpenAPI drift checks passed. |
+| PB3-T10 | Done locally | Independent ladder and security characterization, shared recovery bound and durable-publication regressions; the full isolated working-tree run passed 354 tests. Final-head CI and PR review remain pending; see [phase report](PB3_PHASE_REPORT.md). |
+
+PB2-FIX01's initial pre-commit invocation used the system Python without the
+locked tools on `PATH` and failed to import Ruff/mypy. With `.venv/bin` first
+on `PATH`, all pre-commit hooks passed; the staged secret scan had no findings.
+PB3-T01 had two Ruff E501 failures on long SQL literals, the second in a newly
+added schema-preservation test. The owner selected **“Fix and continue”**;
+those literals were split without changing SQL or assertions. Repeat lint,
+format, mypy, OpenAPI drift, affected and full isolated tests passed.
+PB3-T02's first affected pytest collection found unit and integration files with
+the same basename. The new integration file was renamed without changing its
+tests; the repeat collected and passed all 8 affected tests.
+PB3-T03's first Ruff run interpreted a zero-address test fixture as a server
+binding, so the same address is now constructed with `IPv4Address(0)`. Mypy
+then identified unreachable defensive type checks against annotated fields;
+checking them as untrusted objects retained the guards. Repeat checks passed.
+PB3-T05's first mypy run flagged an optional reverse-action lookup assignment;
+checking the lookup before assignment fixed the type, and repeat checks passed.
+PB3-T06's first Ruff run found missing imports from overlapping edits and long
+SQL literals; the imports were restored and strings split. The first isolated
+run exposed an autoflush that tried to update an append-only command timestamp;
+the timestamp is now set before insertion, retaining the append-only privilege.
+The repeated checks and final affected 44-test suite passed.
+PB3-T07's first Ruff run requested an unquoted return annotation; after the
+annotation was corrected, repeat static checks and the affected suite passed.
+PB3-T09's first mypy run found a variable reused for two distinct result types;
+the manual result now has its own name, and repeat checks passed.
+PB3-T10's characterization first expected 422 for a malformed action ID, but
+central request validation returns 400. A later test expected 422 for an
+overlong decision reason, but the gate explicitly returns 400; the latest
+focused run had 15 passes and 1 failure. Under the stop rule, the owner selected
+**“Preserve 400 (recommended)”**: the test now checks the existing contract and
+that the refused decision does not mutate the action or approval table. The
+mixed recovery-batch and unexpected-publication-failure regressions each
+initially exposed a defect; the fixes passed an affected 37-test isolated run
+before the latest test was added. An initial full isolated run passed 353 tests
+and failed one because `token_urlsafe` can start with a character disallowed by
+the idempotency-key contract. Test keys now use an alphanumeric prefix; invalid
+prefix rejection remains explicitly tested. The repeat full isolated run passed
+**354 tests**, Ruff, formatting, mypy and OpenAPI drift; the namespace had no IP
+route. `make audit` found no known vulnerabilities or secret findings, and
+pre-commit passed. Final-head CI remains a separate PR requirement.
+
+### PB3 acceptance evidence
+
+| Criterion | Evidence |
+|---|---|
+| AC-B3.1 | Database and API Four-Eyes checks, approval races and real-worker eligibility revalidation passed. |
+| AC-B3.2 | Request and execution fixtures for Agent 000, protected IPs and shell injection passed. |
+| AC-B3.3 | Frozen-clock L2 boundary, reverse-safety and real Beat/worker rollback tests passed. |
+| AC-B3.4 | Audited switch, queued-worker pause/resume, manual execution and controlled propagation observation passed; no SLA is claimed under contention. |
+| AC-B3.5 | Connector socket/DNS interception and full no-IP-routing suite passed. |
+
+[PB3 phase report](PB3_PHASE_REPORT.md) lists changed files, full evidence and
+open risks, including the unsupported earlier unmerged 006–008 development
+schema, indefinite approvals, PB4 review and outstanding LGPL legal review.
+The PB4 baseline and later governance gates are pending, not passed.
 
 PB1 was merged into `main` at `fa8b726`. Before PB2 changes, the unchanged
 baseline passed `make check PYTHON=.venv/bin/python` in a network-isolated
@@ -222,5 +298,5 @@ Security-boundary choices must follow the specification's owner-decision process
 | PB2-PB4-FU01 | PB2/PB4 | Done | Celery Beat schedules bounded, database-time cleanup with a service initiator; active limits and both login/cleanup lock orders are tested. See [DR-022](../adr/DR-022.md). The affected isolated suite passed 65 tests. |
 | P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
 
-**Next phase:** Finish PB2, open its PR and wait for the owner's review and
-merge. Do not start PB3 in this request.
+**Historical PB1 handoff:** PB2 was completed and merged; the current PB3
+handoff and its remaining PR review are recorded at the top of this file.

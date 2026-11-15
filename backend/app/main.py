@@ -25,9 +25,11 @@ from app.core.errors import install_error_handling
 from app.core.health import router as health_router
 from app.core.openapi import HostFastAPI
 from app.core.pb2_config import load_pb2_settings
+from app.core.pb3_config import load_pb3_settings
 from app.core.security import PasswordService
 from app.incidents.router import router as incidents_router
 from app.jobs.celery_app import create_celery
+from app.response.router import router as response_router
 from app.threat_intel.providers import MockProvider
 from app.threat_intel.router import router as threat_intel_router
 from app.users.router import router as users_router
@@ -38,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         app.state.settings = load_settings()
         app.state.pb2_settings = load_pb2_settings()
+        app.state.pb3_settings = load_pb3_settings()
     except ConfigurationError:
         raise RuntimeError("Application configuration is invalid") from None
     app.state.legacy_policy = load_legacy_policy()
@@ -55,7 +58,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         socket_connect_timeout=pb2.redis_timeout_seconds,
         socket_timeout=pb2.redis_timeout_seconds,
     )
-    app.state.celery = create_celery(pb2)
+    app.state.celery = create_celery(pb2, app.state.pb3_settings)
     app.state.threat_provider = MockProvider()
     app.state.llm_provider = MockLLM()
     try:
@@ -78,3 +81,4 @@ app.include_router(alerts_router)
 app.include_router(threat_intel_router)
 app.include_router(ai_router)
 app.include_router(incidents_router)
+app.include_router(response_router)

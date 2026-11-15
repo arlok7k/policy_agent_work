@@ -52,6 +52,19 @@ def test_pb2_file_secret_and_redis_urls_are_redacted(
     assert_not_disclosed("PB2 settings representation", repr(settings), signing, broker, cache)
 
 
+def test_webhook_retry_hint_is_positive_and_configurable(
+    pb2_env: tuple[dict[str, str | Redacted], Redacted],
+) -> None:
+    values, _ = pb2_env
+    assert load_pb2_settings(reveal(values)).webhook_retry_after_seconds == 30
+    values["WEBHOOK_RETRY_AFTER_SECONDS"] = "47"
+    assert load_pb2_settings(reveal(values)).webhook_retry_after_seconds == 47
+    for invalid in ("0", "-1", "bad"):
+        values["WEBHOOK_RETRY_AFTER_SECONDS"] = invalid
+        with pytest.raises(ConfigurationError):
+            load_pb2_settings(reveal(values))
+
+
 def test_webhook_signing_secret_must_be_in_a_readable_file(
     pb2_env: tuple[dict[str, str | Redacted], Redacted], tmp_path: Path
 ) -> None:

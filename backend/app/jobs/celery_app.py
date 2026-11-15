@@ -9,10 +9,19 @@ from celery.result import AsyncResult
 from kombu import Queue
 
 from app.core.pb2_config import PB2Settings
+from app.core.pb3_config import PB3Settings, load_pb3_settings
 
 NORMALIZE_ALERT_TASK = "app.jobs.normalize_alert"
 CLEANUP_THROTTLE_TASK = "app.jobs.cleanup_login_throttles"
 CLEANUP_SCHEDULE = "cleanup-expired-login-throttles"
+EXECUTE_RESPONSE_TASK = "app.jobs.execute_response"
+MANUAL_ROLLBACK_TASK = "app.jobs.manual_rollback_response"
+RECONCILE_RESPONSE_TASK = "app.jobs.reconcile_responses"
+RECONCILE_RESPONSE_SCHEDULE = "reconcile-approved-responses"
+RECONCILE_INITIATOR = "service:response-reconcile"
+TTL_SWEEP_TASK = "app.jobs.rollback_expired_responses"
+TTL_SWEEP_SCHEDULE = "rollback-expired-responses"
+TTL_INITIATOR = "service:response-ttl"
 
 
 def require_initiator(headers: object) -> str:
@@ -52,9 +61,10 @@ class InitiatedCelery(Celery):
         return super().send_task(*args, **kwargs)
 
 
-def create_celery(settings: PB2Settings) -> Celery:
+def create_celery(settings: PB2Settings, response: PB3Settings | None = None) -> Celery:
     from app.jobs.tasks import register_tasks
 
+    response = response or load_pb3_settings()
     celery = InitiatedCelery(
         "smart_soc", broker=settings.celery_broker_url.get_secret_value(), task_cls=InitiatedTask
     )
@@ -76,7 +86,27 @@ def create_celery(settings: PB2Settings) -> Celery:
                     "argsrepr": "<redacted>",
                     "kwargsrepr": "<redacted>",
                 },
-            }
+            },
+            RECONCILE_RESPONSE_SCHEDULE: {
+                "task": RECONCILE_RESPONSE_TASK,
+                "schedule": response.response_sweep_interval_seconds,
+                "options": {
+                    "queue": "default",
+                    "headers": {"initiator": RECONCILE_INITIATOR},
+                    "argsrepr": "<redacted>",
+                    "kwargsrepr": "<redacted>",
+                },
+            },
+            TTL_SWEEP_SCHEDULE: {
+                "task": TTL_SWEEP_TASK,
+                "schedule": response.response_sweep_interval_seconds,
+                "options": {
+                    "queue": "default",
+                    "headers": {"initiator": TTL_INITIATOR},
+                    "argsrepr": "<redacted>",
+                    "kwargsrepr": "<redacted>",
+                },
+            },
         },
         task_acks_late=True,
         task_reject_on_worker_lost=True,
@@ -89,5 +119,5 @@ def create_celery(settings: PB2Settings) -> Celery:
             "socket_timeout": settings.redis_timeout_seconds,
         },
     )
-    register_tasks(celery, settings)
+    register_tasks(celery, settings, response)
     return celery
