@@ -5,11 +5,13 @@ PB3 was merged to `main` as `b9d812e4306bf47841d4ee7c9b0a21f95028c98d`; this
 branch starts at that commit. The unchanged main-branch CI run
 [43669756313](https://github.com/arlok7k/policy_agent_work/actions/runs/43669756313)
 passed its network-isolated backend and audit steps. The prior PB3 final-head
-local run passed 354 tests. The current sandbox has Node but no Docker, browser,
-Python 3.15 environment or disposable DB/Redis services; local tooling and a
-way to execute the required Compose tests must be established rather than
-skipping them. A disposable PostgreSQL 18.6 cluster and two Redis 8.2.11
-instances were provisioned locally. The first isolated baseline reached Ruff
+local run passed 354 tests. The sandbox initially lacked Docker, a browser,
+Python 3.15 and disposable DB/Redis services. Disposable local Python,
+Chromium, PostgreSQL 18.6 and two Redis 8.2.11 instances were subsequently
+provisioned for non-Compose checks; Docker and a container daemon remain absent.
+A required real Compose run was attempted in GitHub CI and failed as described
+below; it has not been substituted with the local mock-upstream checks. The
+first isolated baseline reached Ruff
 but local mypy failed because the locally compiled Python lacked `_sqlite3`.
 After repairing that toolchain, the unchanged backend passed **354 tests**,
 Ruff, mypy and OpenAPI in a namespace verified to have no IP route. The
@@ -27,9 +29,27 @@ merge-head GitHub CI also remains green.
 | PB4-FU02 | Backend/frontend implemented; browser verification pending | Explicit development-only HTTP cookie namespace and domain-separated session digests; production/test reject the flag and retain Secure `__Host-` cookies; [DR-040](../adr/DR-040.md). Full no-IP backend run passed Ruff, format, mypy, OpenAPI and 362 tests, including dev HTTP login/CSRF/approval/logout and replay rejection. Frontend lint, type-check, 17 tests and build passed; real browser verification remains PB4-T08. |
 | PB4-T05 | Implemented; Compose runtime verification pending | Added pinned backend/frontend images, internal PostgreSQL/Redis networks, non-root services, health checks, restricted runtime-role provisioning and an explicit development-only secret bootstrap; [DR-041](../adr/DR-041.md). Seven focused unit/integration tests passed in a no-IP namespace; an initial full isolated run passed 367 tests but its parent bridge emitted asynchronous teardown diagnostics despite exit 0. PB4-T07 fixed relay lifetime and a later full no-IP run passed 375 tests without those diagnostics. Fresh `npm ci --ignore-scripts` and build passed (after correcting a local scratch-copy command). Docker is not installed locally; Compose startup and health verification remain mandatory. |
 | PB4-T06 | Implemented; Compose verification pending | Nginx serves the SPA, proxies `/api/`, overwrites forwarded headers, limits requests and applies CSP/frame/nosniff headers plus TLS-only HSTS; an inactive certificate-free TLS template is supplied. [DR-042](../adr/DR-042.md). Two isolated static tests passed. A locally built Nginx with path/port substitutions and a mock upstream passed syntax, SPA fallback, spoofed-header overwrite, 413 and test-TLS/HSTS checks; real Chromium additionally verified CSP execution blocking, inert hostile text, API-only data calls and dialog behavior. This is not a Compose test. Initial local verification failed on an unsupported OpenSSL option, then revealed non-root `/dev/stderr` reopening was denied; `error_log stderr` and disabled edge access logs corrected it. |
-| PB4-T07 | CI jobs implemented; remote and smoke verification pending | The nonsecret password-label translation was renamed to resolve a secret-scanner false positive without disabling the scan. Added pinned frontend and Compose jobs while preserving isolated backend checks; [DR-043](../adr/DR-043.md). Fixed the previously observed bridge-task lifetime/teardown diagnostics; the first new exception-propagation test exposed an uncollected completed-task result, which was corrected. The full no-IP run then passed Ruff, formatting, mypy, OpenAPI and 375 tests without bridge diagnostics. A log-redaction test initially encountered the autouse webhook fixture's file; a dedicated empty directory fixed the fixture. Real GitHub CI and the PB4-T08 Compose smoke remain pending. |
+| PB4-T07 | Compose retry pending | The nonsecret password-label translation was renamed to resolve a secret-scanner false positive without disabling the scan. Added pinned frontend and Compose jobs while preserving isolated backend checks; [DR-043](../adr/DR-043.md). Fixed the previously observed bridge-task lifetime/teardown diagnostics; the first new exception-propagation test exposed an uncollected completed-task result, which was corrected. The full no-IP run then passed Ruff, formatting, mypy, OpenAPI and 375 tests without bridge diagnostics. A log-redaction test initially encountered the autouse webhook fixture's file; a dedicated empty directory fixed the fixture. In [GitHub CI run 43697058100](https://github.com/arlok7k/policy_agent_work/actions/runs/43697058100), backend and frontend passed and Compose configuration validated, but `docker compose up --build --wait` failed. The owner provided the sanitized Nginx networking error; a retry after PB4-FU03 is required. |
+| PB4-FU03 | Implemented; Compose retry pending | Reserve the approved Nginx IP outside Docker's dynamic address pool without changing proxy trust; [DR-044](../adr/DR-044.md). The first new config test failed on the missing allocation range, as expected; after adding the range, Ruff, formatting and seven focused tests passed, including IPv4/IPv6 collision and trust-mismatch mutations. Real Compose startup is not yet verified. |
 | PB4-T08 | Pending | Real Compose Playwright smoke and security tests. |
 | PB4-T09 | Pending | Operator README, webhook signing, stubs and phase evidence. |
+
+### PB4 verification blocker
+
+The first real Compose attempt was [job 132759868502](https://github.com/arlok7k/policy_agent_work/actions/runs/43697058100/job/132759868502)
+at commit `39c2a724ddd5cca6b609e8a8d0bc21457b08a02a`. The `Build and start the full stack` step failed; the
+health check was skipped, while the redacted diagnostic and cleanup steps ran.
+GitHub reported only exit code 1 through its job metadata. Fetching the detailed
+logs with `gh run view --job 132759868502 --log-failed` returned EOF when the
+sandbox attempted to reach GitHub's log-download host. The owner subsequently
+provided the sanitized error: `failed to set up container networking: Address
+already in use`, occurring when Nginx started. Docker documents reserving static
+addresses outside the automatic IP range; the old configuration had no such
+reservation, though the error alone does not establish which address conflicted.
+PB4-FU03 adds the selected reservation without changing proxy trust; a new CI
+run is required to determine whether stack startup succeeds. Local Docker is
+unavailable, and the real Playwright smoke has not been implemented or run.
+The baseline approval gate has not been reached and P0 is not authorized.
 
 The owner selected **“Add minimal endpoints (recommended)”** for the missing
 settings, command-log and Kill Switch read APIs, preserving existing behavior.
