@@ -198,6 +198,35 @@ services:
       retries: 12
       start_period: 10s
 
+  playwright:
+    # Explicitly opt-in, disposable end-to-end test client; never a host service.
+    profiles: [e2e]
+    image: smart-soc-e2e:pb4
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.e2e
+    user: "10001:10001"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    shm_size: 256m
+    tmpfs: ["/tmp:rw,nosuid,nodev,noexec,size=256m,uid=10001,gid=10001,mode=1770"]
+    environment:
+      SOC_BASE_URL: http://nginx:8080
+      SOC_E2E_DISPOSABLE: ${SOC_E2E_DISPOSABLE:-0}
+      SOC_E2E_INTERNAL_ENDPOINTS:
+      GITHUB_ACTIONS:
+      SOC_WEBHOOK_SECRET_FILE: /run/secrets/webhook_secret
+      SEED_ADMIN_PASSWORD:
+      SEED_SENIOR_ANALYST_PASSWORD:
+      SEED_ANALYST_PASSWORD:
+    secrets: [webhook_secret]
+    networks: [edge]
+    depends_on:
+      nginx:
+        condition: service_healthy
+
 networks:
   edge: {}
   internal:

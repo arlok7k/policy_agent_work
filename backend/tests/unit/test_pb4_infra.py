@@ -81,9 +81,14 @@ def test_compose_only_publishes_nginx_and_keeps_data_services_internal() -> None
         "celery-beat",
         "nginx",
     }
-    assert set(services) == expected
+    assert set(services) == expected | {"playwright"}
     assert [name for name, service in services.items() if "ports" in service] == ["nginx"]
     assert config["networks"]["internal"]["internal"] is True
+    browser = services["playwright"]
+    assert browser["profiles"] == ["e2e"]
+    assert browser["networks"] == ["edge"]
+    assert browser["user"] != "0:0" and "ALL" in browser["cap_drop"]
+    assert set(browser["secrets"]) == {"webhook_secret"}
     for name in expected - {"nginx"}:
         assert services[name]["networks"] == ["internal"]
         assert services[name]["user"] != "0:0"
