@@ -9,16 +9,26 @@ successful test alone.
 
 ## Prerequisites and boundaries
 
-Use Docker Engine with the Compose plugin, Python 3.10 or newer for the host
-bootstrap and smoke scripts, and a host with enough disk and memory to build the
-pinned images. The examples below assume default `SOC_*` paths and ports and a
-fresh, disposable Compose project; the backend image itself uses Python 3.15.
-The example is **development-only and disposable**. The default Nginx port is bound
-to `127.0.0.1:8080`; PostgreSQL and the separate Redis broker and cache have no
-published ports and run on an internal network. Only Nginx has an edge-facing
-port. A Docker administrator or a process already attached to the internal
-network is inside the trust boundary. The opt-in test client attaches only to
-the edge network, and is not a production service.
+Use Docker Engine 28 or newer with the Compose plugin, Python 3.10 or newer for
+the host bootstrap and smoke scripts, and a host with enough disk and memory to
+build the pinned images. Docker [1](https://docs.docker.com/engine/network/port-publishing/)
+warns that older releases can expose ports bound to loopback to hosts on the same
+layer-2 network. The examples below assume
+default `SOC_*` paths and ports and a fresh, disposable Compose project; the
+backend image itself uses Python 3.15. The example is **development-only and
+disposable**. The default Nginx port is bound to `127.0.0.1:8080`; PostgreSQL
+and the separate Redis broker and cache have no published ports and run on an
+internal network. Only Nginx has an edge-facing port.
+
+The current configuration uses Docker's ordinary internal bridge. Docker
+[4](https://docs.docker.com/reference/cli/docker/network/create/) documents
+that host processes can normally reach an internal bridge's container IPs even
+without published ports. Thus, treat the whole Docker host, not just Docker
+administrators or attached containers, as trusted; use no untrusted local users.
+The smoke proves that its edge-only test container cannot reach data services,
+not that host processes cannot. The owner must decide the host isolation boundary
+before AC-B4.3 is considered complete; see [DR-048](../adr/DR-048.md). The
+opt-in test client is not a production service.
 
 The Compose migration service uses the owner database credential and provisions
 a separate restricted runtime login. Backend, worker and Beat receive only
