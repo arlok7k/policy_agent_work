@@ -42,8 +42,12 @@ Compose also accepts `SOC_BIND_ADDRESS` (default `127.0.0.1`) and
 `SOC_POSTGRES_PASSWORD_FILE`, `SOC_MIGRATOR_DATABASE_URL_FILE`,
 `SOC_RUNTIME_DATABASE_URL_FILE`, `SOC_WEBHOOK_SECRET_FILE`, and
 `SOC_SESSION_SIGNING_SECRET_FILE` select the five file-backed Compose secrets;
-their defaults are disposable files under `infra/secrets/dev/`. See the
-[operator guide](HPB_README.md) and [secret instructions](../../infra/secrets/README.md).
+their defaults are disposable files under `infra/secrets/dev/`. The internal
+network is an IPv4-only Docker `isolated` bridge; before and after starting it,
+run the host preflight and verification described in the
+[operator guide](HPB_README.md). The checks require a local native Linux Docker
+Engine 28+ and do not protect against root or Docker administrators. See also
+[secret instructions](../../infra/secrets/README.md).
 `SEED_ADMIN_PASSWORD`, `SEED_SENIOR_ANALYST_PASSWORD` and
 `SEED_ANALYST_PASSWORD` are consumed only by the explicit development seed.
 `SOC_E2E_DISPOSABLE`, `SOC_E2E_INTERNAL_ENDPOINTS` and `SOC_BASE_URL` are

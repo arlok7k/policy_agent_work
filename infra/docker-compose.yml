@@ -230,7 +230,11 @@ services:
 networks:
   edge: {}
   internal:
+    driver: bridge
     internal: true
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
     ipam:
       config:
         - subnet: 172.30.42.0/24

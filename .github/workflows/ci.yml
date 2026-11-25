@@ -87,6 +87,8 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Generate throwaway development secrets
         run: python3 scripts/bootstrap_dev_secrets.py
+      - name: Verify Docker host and existing network before startup
+        run: python3 scripts/check_compose_isolation.py preflight
       - name: Validate Compose configuration
         run: |
           docker compose -f infra/docker-compose.yml config --quiet
@@ -99,6 +101,8 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:8080/api/health
           echo
           docker compose -f infra/docker-compose.yml ps -a
+      - name: Verify host and internal network boundaries
+        run: python3 scripts/check_compose_isolation.py verify
       - name: Run the real Compose Playwright smoke
         run: python3 scripts/run_compose_e2e.py --disposable
       - name: Redacted service diagnostics

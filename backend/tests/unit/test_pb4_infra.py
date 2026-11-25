@@ -83,7 +83,11 @@ def test_compose_only_publishes_nginx_and_keeps_data_services_internal() -> None
     }
     assert set(services) == expected | {"playwright"}
     assert [name for name, service in services.items() if "ports" in service] == ["nginx"]
-    assert config["networks"]["internal"]["internal"] is True
+    internal = config["networks"]["internal"]
+    assert internal["internal"] is True
+    assert internal["driver"] == "bridge"
+    assert internal["enable_ipv6"] is False
+    assert internal["driver_opts"]["com.docker.network.bridge.gateway_mode_ipv4"] == "isolated"
     browser = services["playwright"]
     assert browser["profiles"] == ["e2e"]
     assert browser["networks"] == ["edge"]

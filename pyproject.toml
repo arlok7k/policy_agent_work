@@ -55,6 +55,10 @@ target-version = "py315"
 line-length = 100
 src = ["backend", "scripts"]
 
+# Host-side Compose checks also run on operator/CI Python 3.10+.
+[tool.ruff.per-file-target-version]
+"scripts/check_compose_isolation.py" = "py310"
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
 

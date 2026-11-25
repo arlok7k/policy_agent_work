@@ -9,26 +9,32 @@ successful test alone.
 
 ## Prerequisites and boundaries
 
-Use Docker Engine 28 or newer with the Compose plugin, Python 3.10 or newer for
-the host bootstrap and smoke scripts, and a host with enough disk and memory to
-build the pinned images. Docker [1](https://docs.docker.com/engine/network/port-publishing/)
-warns that older releases can expose ports bound to loopback to hosts on the same
-layer-2 network. The examples below assume
-default `SOC_*` paths and ports and a fresh, disposable Compose project; the
-backend image itself uses Python 3.15. The example is **development-only and
-disposable**. The default Nginx port is bound to `127.0.0.1:8080`; PostgreSQL
-and the separate Redis broker and cache have no published ports and run on an
-internal network. Only Nginx has an edge-facing port.
+Use a stable **native Linux Docker Engine 28.0 or newer**, a local Docker Unix
+socket, the Compose plugin, and Python 3.10 or newer for the host bootstrap and
+verification scripts. The socket must connect to the Docker daemon on the same
+host/network namespace as the host-side checks; do not use a forwarded socket,
+remote daemon, Docker Desktop VM, or containerized client for this evidence.
+Docker [1](https://docs.docker.com/engine/network/port-publishing/) warns that
+older releases can expose loopback-published ports to the same layer-2 network.
+The examples assume default `SOC_*` paths and ports, enough resources to build
+the pinned images, and a fresh, disposable Compose project; the backend image
+itself uses Python 3.15. This setup is **development-only and disposable**. The
+default Nginx port is bound to `127.0.0.1:8080`; PostgreSQL and the separate
+Redis broker and cache have no published ports. Only Nginx has an edge-facing
+port.
 
-The current configuration uses Docker's ordinary internal bridge. Docker
-[4](https://docs.docker.com/reference/cli/docker/network/create/) documents
-that host processes can normally reach an internal bridge's container IPs even
-without published ports. Thus, treat the whole Docker host, not just Docker
-administrators or attached containers, as trusted; use no untrusted local users.
-The smoke proves that its edge-only test container cannot reach data services,
-not that host processes cannot. The owner must decide the host isolation boundary
-before AC-B4.3 is considered complete; see [DR-048](../adr/DR-048.md). The
-opt-in test client is not a production service.
+The internal IPv4 bridge uses Docker's `isolated` gateway mode; IPv6 is disabled
+on that network. Before starting and after it is healthy, run the checks below:
+Compose alone does not enforce the host-side preflight. The runtime check inspects
+actual container addresses and published ports, requires backend connections to
+all three data services by name and address, requires host access to published
+Nginx, and rejects host connections to each data service. It then repeats the
+internal control. This measures the invoking host process, not every possible
+host configuration; repeat it after daemon, network or deployment changes.
+Docker administrators, root, and users who can change firewall/routing or
+attach containers can bypass the boundary. Redis is unauthenticated inside the
+network; do not treat this as isolation from compromised internal services. See
+[DR-048](../adr/DR-048.md). The opt-in test client is not a production service.
 
 The Compose migration service uses the owner database credential and provisions
 a separate restricted runtime login. Backend, worker and Beat receive only
@@ -48,8 +54,10 @@ From the repository root in a Bash shell:
 ```sh
 export ENV=development DEV_INSECURE_COOKIES=true
 python3 scripts/bootstrap_dev_secrets.py
+python3 scripts/check_compose_isolation.py preflight
 docker compose -f infra/docker-compose.yml config --quiet
 docker compose -f infra/docker-compose.yml up --build --wait --wait-timeout 300
+python3 scripts/check_compose_isolation.py verify
 docker compose -f infra/docker-compose.yml ps -a
 curl --fail --silent --show-error http://127.0.0.1:8080/api/health
 ```
@@ -65,10 +73,20 @@ for HTTP only; it is rejected outside development. Without this explicit opt-in,
 Secure `__Host-` cookies require HTTPS. Never expose this HTTP development setup
 to an untrusted network or reuse its secrets in production.
 
-If an existing Compose network predates the IPAM reservation, stop only the
-intended stack with `docker compose -f infra/docker-compose.yml down` and start
-it again to recreate the network. This command retains named volumes. Never use
-`down --volumes` on data you need to keep.
+**Do not proceed if either isolation check fails.** Preflight rejects an
+unsupported engine, a remote/ambiguous Docker context, and a pre-existing data
+network whose mode, IP version or IPAM allocation does not match this Compose
+file. The post-start check also rejects extra data-service networks, published
+ports, unreachable positive controls, and any successful host connection. It does
+not modify networks, containers, or volumes.
+
+If a pre-existing network is stale (for example, an ordinary bridge from an
+older revision), first identify and stop only the intended stack with
+`docker compose -f infra/docker-compose.yml down`, then rerun preflight and
+startup to recreate the network. This command retains named volumes; other
+attached containers can prevent network removal and must be investigated. Never
+use `down --volumes` on data you need to keep. If both `DOCKER_HOST` and
+`DOCKER_CONTEXT` are set, unset the unintended override before checking.
 
 ## Seed initial development users
 
@@ -143,11 +161,11 @@ These steps never isolate a real host.
 
 ## Tests and disposable smoke
 
-CI validates Compose and runs the full backend suite with IP networking
-explicitly disabled, migration/contract checks, dependency/license/secret scans,
-frontend checks and the Playwright smoke. To reproduce the browser workflow,
-start a **fresh disposable** development stack as above, without manually
-seeding users, then run:
+CI validates Compose and the host/internal connectivity controls, and runs the
+full backend suite with IP networking explicitly disabled, migration/contract
+checks, dependency/license/secret scans, frontend checks and the Playwright smoke.
+To reproduce the browser workflow, start and verify a **fresh disposable**
+development stack as above, without manually seeding users, then run:
 
 ```sh
 ENV=development DEV_INSECURE_COOKIES=true \
