@@ -104,7 +104,7 @@ export function ResponsePage() {
         <DataState state={killSwitch.state} retry={killSwitch.reload}>{(current) => <>
           <div className={`switch-state ${current.engaged ? 'switch-engaged' : ''}`}><div><small>CURRENT STATE</small><strong>{current.engaged ? 'Engaged' : 'Disengaged'}</strong><p>{current.engaged ? 'Automation is paused.' : 'Automation is permitted.'}</p></div><Badge value={current.engaged ? 'engaged' : 'disengaged'} /></div>
           <p className="panel-footnote">The switch pauses automated response and TTL rollback. Human-approved work may continue.</p>
-          {canOperate && !switchConfirm && <button className={`button ${current.engaged ? '' : 'button-danger'}`} onClick={() => setSwitchConfirm(true)}>{current.engaged ? 'Disengage Kill Switch' : 'Engage Kill Switch'}</button>}
+          {canOperate && <button type="button" aria-haspopup="dialog" aria-expanded={switchConfirm} className={`button ${current.engaged ? '' : 'button-danger'}`} onClick={() => setSwitchConfirm(true)}>{current.engaged ? 'Disengage Kill Switch' : 'Engage Kill Switch'}</button>}
           {!canOperate && <p className="form-hint">Only a senior analyst or admin can change this control.</p>}
           {switchConfirm && <Dialog open title={current.engaged ? 'Resume automation?' : 'Pause automation?'} onClose={() => setSwitchConfirm(false)}>
             <p>{current.engaged ? 'Queued automated work may resume.' : 'Automated response and TTL rollback will pause; human-approved execution may continue.'}</p>

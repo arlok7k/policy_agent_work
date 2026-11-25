@@ -69,6 +69,18 @@ describe('API-backed host pages', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm approve' }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/response/actions/action-1/approve', {}));
   });
+  it.each(['escape', 'close', 'cancel'] as const)('returns focus after %s dismisses Kill Switch confirmation', async (method) => {
+    setup(senior); mount('/response');
+    const trigger = await screen.findByRole('button', { name: 'Engage Kill Switch' });
+    trigger.focus(); fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Pause automation?' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    if (method === 'escape') fireEvent(dialog, new Event('cancel', { bubbles: true, cancelable: true }));
+    else fireEvent.click(screen.getByRole('button', { name: method === 'close' ? 'Close dialog' : 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
   it('saves only presentation settings as an administrator', async () => {
     setup(admin); vi.mocked(api.patch).mockResolvedValue({ data: settings }); mount('/settings');
     const name = await screen.findByLabelText('Display name');
