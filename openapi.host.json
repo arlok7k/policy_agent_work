@@ -740,6 +740,100 @@
         "title": "EvidenceView",
         "type": "object"
       },
+      "ExecutedCommandPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutedCommandView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id"
+          }
+        },
+        "required": [
+          "items",
+          "next_before_id"
+        ],
+        "title": "ExecutedCommandPage",
+        "type": "object"
+      },
+      "ExecutedCommandView": {
+        "properties": {
+          "action_id": {
+            "format": "uuid",
+            "title": "Action Id",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "connector": {
+            "title": "Connector",
+            "type": "string"
+          },
+          "executed_at": {
+            "format": "date-time",
+            "title": "Executed At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "initiator": {
+            "title": "Initiator",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "phase": {
+            "enum": [
+              "execute",
+              "rollback"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "simulated": {
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "action_id",
+          "phase",
+          "connector",
+          "command",
+          "target",
+          "params",
+          "initiator",
+          "simulated",
+          "executed_at"
+        ],
+        "title": "ExecutedCommandView",
+        "type": "object"
+      },
       "HealthStatus": {
         "properties": {
           "status": {
@@ -1112,6 +1206,38 @@
         "title": "KillSwitchChange",
         "type": "object"
       },
+      "KillSwitchStateView": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "changed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By"
+          },
+          "engaged": {
+            "title": "Engaged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "engaged",
+          "changed_by",
+          "changed_at"
+        ],
+        "title": "KillSwitchStateView",
+        "type": "object"
+      },
       "KillSwitchView": {
         "properties": {
           "changed_at": {
@@ -1156,6 +1282,28 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "PresentationView": {
+        "properties": {
+          "default_direction": {
+            "enum": [
+              "ltr",
+              "rtl"
+            ],
+            "title": "Default Direction",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name",
+          "default_direction"
+        ],
+        "title": "PresentationView",
         "type": "object"
       },
       "PrincipalResponse": {
@@ -1314,6 +1462,67 @@
         "additionalProperties": false,
         "properties": {},
         "title": "RollbackRequest",
+        "type": "object"
+      },
+      "SettingsPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "default_direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ltr",
+                  "rtl"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Direction"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "title": "SettingsPatch",
+        "type": "object"
+      },
+      "SettingsView": {
+        "properties": {
+          "default_direction": {
+            "enum": [
+              "ltr",
+              "rtl"
+            ],
+            "title": "Default Direction",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name",
+          "default_direction",
+          "updated_at"
+        ],
+        "title": "SettingsView",
         "type": "object"
       },
       "SummaryResult": {
@@ -3765,6 +3974,79 @@
         ]
       }
     },
+    "/api/presentation": {
+      "get": {
+        "description": "Read-only display name and default direction for all active host users.",
+        "operationId": "read_presentation_api_presentation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Read Presentation",
+        "tags": [
+          "presentation"
+        ],
+        "x-legacy-operation": "presentation_read",
+        "x-legacy-roles": [
+          "analyst",
+          "senior_analyst",
+          "admin"
+        ]
+      }
+    },
     "/api/response/actions": {
       "get": {
         "description": "All active legacy roles share visibility. Supports incident filtering and bounded descending timestamp/UUID cursor pagination.",
@@ -4539,7 +4821,224 @@
         ]
       }
     },
+    "/api/response/commands": {
+      "get": {
+        "description": "Append-only simulated execution and rollback records, ordered by descending ID; bounded by DEFAULT_PAGE_SIZE and MAX_PAGE_SIZE, optionally filtered by action_id.",
+        "operationId": "executed_commands_api_response_commands_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutedCommandPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Executed Commands",
+        "tags": [
+          "response"
+        ],
+        "x-legacy-operation": "response_read",
+        "x-legacy-roles": [
+          "analyst",
+          "senior_analyst",
+          "admin"
+        ]
+      }
+    },
     "/api/response/kill-switch": {
+      "get": {
+        "description": "Current automation switch state; changed_by is null until the first change.",
+        "operationId": "read_kill_switch_api_response_kill_switch_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitchStateView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Read Kill Switch",
+        "tags": [
+          "response"
+        ],
+        "x-legacy-operation": "response_read",
+        "x-legacy-roles": [
+          "analyst",
+          "senior_analyst",
+          "admin"
+        ]
+      },
       "post": {
         "description": "Engage or disengage automation, auditing every authorized request. Human-approved execution remains possible; queued automation and TTL jobs pause.",
         "operationId": "kill_switch_api_response_kill_switch_post",
@@ -4629,6 +5128,177 @@
         "x-legacy-operation": "response_kill_switch",
         "x-legacy-roles": [
           "senior_analyst",
+          "admin"
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "read_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Read Settings",
+        "tags": [
+          "settings"
+        ],
+        "x-legacy-operation": "settings",
+        "x-legacy-roles": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "description": "Administrator-only presentation settings; display_name uses USERNAME_MAX_CHARS. Every change is audited atomically; operational and security policy is not editable.",
+        "operationId": "change_settings_api_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "CSRFCookie": [],
+            "CSRFHeader": [],
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Change Settings",
+        "tags": [
+          "settings"
+        ],
+        "x-legacy-operation": "settings",
+        "x-legacy-roles": [
           "admin"
         ]
       }

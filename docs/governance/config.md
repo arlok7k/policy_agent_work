@@ -7,7 +7,9 @@ starting. Configuration failures do not print supplied values.
 
 | Key | Required | Meaning |
 |---|---|---|
-| `ENV` | Yes | `development`, `test`, or `production`. |
+| `ENV` | Yes | `development`, `test`, or `production`; Compose defaults to `development`. |
+| `DEV_INSECURE_COOKIES` | No | Only `true` or `false`, only with `ENV=development`. `true` enables separate non-Secure development cookie names for local HTTP; when absent the Secure `__Host-` names are used. The flag's presence, even `false`, is rejected in test and production. See [DR-040](../adr/DR-040.md). |
+| `TRUSTED_PROXY_IPS` | No | Comma-separated exact trusted peer IPs; empty or absent trusts none. No CIDRs, wildcards, duplicates, scoped, unspecified or multicast addresses. A trusted peer must provide exactly one valid `X-Forwarded-For` IP; headers from other peers are ignored. Compose fixes this to Nginx's internal IP. See [DR-039](../adr/DR-039.md). |
 | `DATABASE_URL` / `DATABASE_URL_FILE` | Exactly one | SQLAlchemy PostgreSQL URL using `postgresql+psycopg`. The URL may contain credentials and is treated as secret. |
 | `SESSION_SIGNING_SECRET` / `SESSION_SIGNING_SECRET_FILE` | Exactly one | Cryptographically random secret with at least 32 bytes of entropy, supplied by an operator. |
 | `SESSION_TTL_SECONDS` | Yes | Positive session lifetime; example 28800. |
@@ -35,21 +37,44 @@ starting. Configuration failures do not print supplied values.
 | `CELERY_BROKER_URL` / `CELERY_BROKER_URL_FILE` | Exactly one | Redis broker URL; treated as a secret because it may contain credentials. |
 | `REDIS_CACHE_URL` / `REDIS_CACHE_URL_FILE` | Exactly one | URL of a separate Redis cache instance; treated as a secret. |
 
+Compose also accepts `SOC_BIND_ADDRESS` (default `127.0.0.1`) and
+`SOC_HTTP_PORT` (default `8080`) for the Nginx HTTP publication. The host-side
+`SOC_POSTGRES_PASSWORD_FILE`, `SOC_MIGRATOR_DATABASE_URL_FILE`,
+`SOC_RUNTIME_DATABASE_URL_FILE`, `SOC_WEBHOOK_SECRET_FILE`, and
+`SOC_SESSION_SIGNING_SECRET_FILE` select the five file-backed Compose secrets;
+their defaults are disposable files under `infra/secrets/dev/`. The internal
+network is an IPv4-only Docker `isolated` bridge; before and after starting it,
+run the host preflight and verification described in the
+[operator guide](HPB_README.md). The checks require a local native Linux Docker
+Engine 28+ and do not protect against root or Docker administrators. See also
+[secret instructions](../../infra/secrets/README.md).
+`SEED_ADMIN_PASSWORD`, `SEED_SENIOR_ANALYST_PASSWORD` and
+`SEED_ANALYST_PASSWORD` are consumed only by the explicit development seed.
+`SOC_E2E_DISPOSABLE`, `SOC_E2E_INTERNAL_ENDPOINTS` and `SOC_BASE_URL` are
+configured by the disposable end-to-end harness for its test container, not
+production application settings.
+
 The two Redis instances must be provisioned separately; the loader rejects
 identical endpoints but cannot identify every possible DNS alias. Normal
 `redis://`/`rediss://` URLs are supported, as are `redis+socket:///...` for the
 broker and `unix:///...` for the cache. The application validates PB2 settings
 at startup but does not claim Redis readiness until a request actually uses it.
-The PB4 infrastructure has not yet been built. Start a worker with the same
-required settings and restricted database login as the API:
-`PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery worker -Q default`.
+Compose starts a worker and Beat using the PB4 deployment entrypoint. For manual
+startup, use the same entrypoint, required settings and restricted database login
+as the API:
+`PYTHONPATH=backend <venv>/bin/celery -A app.jobs.compose_worker:celery worker -Q default`.
 Start one Beat process with the same configuration and a durable writable schedule
 file, for example:
 
 ```sh
-PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery beat \
+PYTHONPATH=backend <venv>/bin/celery -A app.jobs.compose_worker:celery beat \
   --schedule=/var/lib/smart-soc/celerybeat-schedule
 ```
+
+Do not use the original `app.jobs.worker:celery` entrypoint for a standalone
+worker: it does not register all response-action ORM foreign-key mappings.
+The PB4 entrypoint registers the existing incident model without changing the
+underlying response logic; see [DR-046](../adr/DR-046.md).
 
 Provision that directory outside the repository. All API and worker replicas must share an identical
 `LOGIN_WINDOW_SECONDS`; see [DR-022](../adr/DR-022.md) for the cleanup's locking,

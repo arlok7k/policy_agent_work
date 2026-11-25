@@ -5,11 +5,12 @@ from uuid import UUID
 
 from celery import Celery
 from fastapi import APIRouter, Depends, Query, Request, Response, status
+from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.roles import operation_roles, require_operation
-from app.auth.session import SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, request_session_token
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import BadRequest, Unavailable
@@ -21,11 +22,15 @@ from app.jobs.celery_app import EXECUTE_RESPONSE_TASK, MANUAL_ROLLBACK_TASK
 from app.response.catalog import CatalogPage, catalog_page
 from app.response.gate import Decision, decide_action
 from app.response.manual_rollback import request_manual_rollback
+from app.response.models import ExecutedCommand
 from app.response.schemas import (
     ActionPage,
     ActionRequest,
     ActionView,
     DecisionRequest,
+    ExecutedCommandPage,
+    ExecutedCommandView,
+    KillSwitchStateView,
     RollbackRequest,
 )
 from app.response.service import action_view, list_actions, request_action
@@ -85,6 +90,54 @@ def actions(
     return result
 
 
+@router.get("/commands", response_model=ExecutedCommandPage)
+def executed_commands(
+    request: Request,
+    response: Response,
+    identity: ResponseReader,
+    db: Database,
+    limit: Annotated[int | None, Query(gt=0)] = None,
+    before_id: Annotated[int | None, Query(gt=0)] = None,
+    action_id: UUID | None = None,
+) -> ExecutedCommandPage:
+    """Read the append-only executed-command log, never inferred action status."""
+    settings: Settings = request.app.state.settings
+    size = page_size(settings, limit)
+    query = select(ExecutedCommand).order_by(ExecutedCommand.id.desc())
+    if before_id is not None:
+        query = query.where(ExecutedCommand.id < before_id)
+    if action_id is not None:
+        query = query.where(ExecutedCommand.action_id == action_id)
+    try:
+        rows = list(db.execute(query.limit(size + 1)).scalars())
+        page = rows[:size]
+        result = ExecutedCommandPage(
+            items=[ExecutedCommandView.model_validate(row) for row in page],
+            next_before_id=page[-1].id if len(rows) > size else None,
+        )
+    except SQLAlchemyError:
+        raise Unavailable() from None
+    private_json(response)
+    return result
+
+
+@router.get("/kill-switch", response_model=KillSwitchStateView)
+def read_kill_switch(
+    response: Response, identity: ResponseReader, db: Database
+) -> KillSwitchStateView:
+    try:
+        row = db.execute(
+            text("SELECT engaged, changed_by, changed_at FROM kill_switch_state WHERE id=1")
+        ).one_or_none()
+        if row is None:
+            raise Unavailable()
+        result = KillSwitchStateView.model_validate(row, from_attributes=True)
+    except SQLAlchemyError:
+        raise Unavailable() from None
+    private_json(response)
+    return result
+
+
 @router.post(
     "/actions",
     response_model=ActionView,
@@ -127,7 +180,7 @@ def create_action(
             pb2,
             pb3,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_request"),
             body,
             keys[0] if keys else None,
@@ -159,7 +212,7 @@ def _decision(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_decide"),
             action_id,
             decision,
@@ -219,7 +272,7 @@ def rollback(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_rollback"),
             action_id,
             request_peer_ip(request),
@@ -256,7 +309,7 @@ def kill_switch(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "response_kill_switch"),
             body.engaged,
             request_peer_ip(request),

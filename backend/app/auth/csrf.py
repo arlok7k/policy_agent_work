@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
-from app.auth.session import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE, session_rows
+from app.auth.session import CSRF_HEADER, request_csrf_token, request_session_token, session_rows
 from app.core.config import Settings
 from app.core.errors import problem_response
 from app.core.security import credential_digest
@@ -46,7 +46,7 @@ def _check_csrf(request: Request, token: str) -> int | None:
             if not csrf_matches(
                 settings.session_signing_secret,
                 rows[0].csrf_digest,
-                request.cookies.get(CSRF_COOKIE),
+                request_csrf_token(request),
                 request.headers.get(CSRF_HEADER),
             ):
                 return 403
@@ -56,7 +56,7 @@ def _check_csrf(request: Request, token: str) -> int | None:
 
 
 async def csrf_guard(request: Request, call_next: CallNext) -> Response:
-    token = request.cookies.get(SESSION_COOKIE)
+    token = request_session_token(request)
     if token and request.headers.get("Authorization") is not None:
         return problem_response(request, 401)
     if token and request.method not in {"GET", "HEAD", "OPTIONS"}:

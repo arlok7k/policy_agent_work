@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 from collections.abc import Mapping
+from ipaddress import IPv4Address, IPv6Address, ip_address
 from pathlib import Path
 from typing import Literal
 
@@ -53,14 +54,38 @@ class Settings(BaseModel):
     username_max_chars: PositiveInt
     api_key_name_max_chars: PositiveInt
     max_api_key_ttl_seconds: PositiveInt
+    trusted_proxy_ips: tuple[IPv4Address | IPv6Address, ...] = ()
+    dev_insecure_cookies: bool = False
 
     @model_validator(mode="after")
     def valid_policies(self) -> Settings:
+        if self.dev_insecure_cookies and self.environment != "development":
+            raise ValueError("insecure cookies are development-only")
         if self.password_min_chars > self.password_max_chars:
             raise ValueError("invalid password policy")
         if self.default_page_size > self.max_page_size:
             raise ValueError("invalid pagination policy")
         return self
+
+    @field_validator("trusted_proxy_ips", mode="before")
+    @classmethod
+    def validate_trusted_proxy_ips(cls, value: object) -> tuple[IPv4Address | IPv6Address, ...]:
+        if value is None or value == "":
+            return ()
+        if not isinstance(value, str):
+            raise ValueError("trusted proxies must be comma-separated exact IP addresses")
+        try:
+            parts = value.split(",")
+            if any(not part.strip() or "%" in part for part in parts):
+                raise ValueError("invalid trusted proxy")
+            proxies = tuple(ip_address(part.strip()) for part in parts)
+            if len(set(proxies)) != len(proxies) or any(
+                proxy.is_unspecified or proxy.is_multicast for proxy in proxies
+            ):
+                raise ValueError("invalid trusted proxy")
+            return proxies
+        except ValueError:
+            raise ValueError("invalid trusted proxy addresses") from None
 
     @field_validator("database_url")
     @classmethod
@@ -108,6 +133,11 @@ def load_database_url(environ: Mapping[str, str] | None = None) -> SecretStr:
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     """Load settings once at startup; never include values in exceptions."""
     source = os.environ if environ is None else environ
+    dev_cookies = source.get("DEV_INSECURE_COOKIES")
+    if dev_cookies is not None and (
+        source.get("ENV") != "development" or dev_cookies not in {"true", "false"}
+    ):
+        raise ConfigurationError("Invalid application configuration")
     try:
         return Settings.model_validate(
             {
@@ -124,6 +154,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
                 "username_max_chars": source.get("USERNAME_MAX_CHARS"),
                 "api_key_name_max_chars": source.get("API_KEY_NAME_MAX_CHARS"),
                 "max_api_key_ttl_seconds": source.get("MAX_API_KEY_TTL_SECONDS"),
+                "trusted_proxy_ips": source.get("TRUSTED_PROXY_IPS", ""),
+                "dev_insecure_cookies": dev_cookies == "true",
             }
         )
     except ValidationError:

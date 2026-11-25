@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+from ipaddress import ip_address
 from pathlib import Path
 
 import pytest
@@ -171,3 +172,45 @@ def test_inverted_pagination_policy_fails(env_values: dict[str, str | Redacted])
     env_values["DEFAULT_PAGE_SIZE"] = str(int(env_values["MAX_PAGE_SIZE"]) + 1)
     with pytest.raises(ConfigurationError):
         load_settings(reveal(env_values))
+
+
+def test_proxy_addresses_are_exact_and_configuration_is_fail_closed(
+    env_values: dict[str, str | Redacted],
+) -> None:
+    env_values["TRUSTED_PROXY_IPS"] = "192.0.2.10, 2001:db8::10"
+    configured = load_settings(reveal(env_values))
+    assert configured.trusted_proxy_ips == (ip_address("192.0.2.10"), ip_address("2001:db8::10"))
+    for invalid in (
+        "*",
+        "192.0.2.0/24",
+        "192.0.2.1,,192.0.2.2",
+        "127.0.0.1,127.0.0.1",
+        "::",
+        "fe80::1%eth0",
+    ):
+        env_values["TRUSTED_PROXY_IPS"] = invalid
+        with pytest.raises(ConfigurationError):
+            load_settings(reveal(env_values))
+
+
+def test_insecure_cookie_mode_is_explicit_and_development_only(
+    env_values: dict[str, str | Redacted],
+) -> None:
+    env_values["ENV"] = "development"
+    assert not load_settings(reveal(env_values)).dev_insecure_cookies
+    env_values["DEV_INSECURE_COOKIES"] = "false"
+    assert not load_settings(reveal(env_values)).dev_insecure_cookies
+    env_values["DEV_INSECURE_COOKIES"] = "true"
+    assert load_settings(reveal(env_values)).dev_insecure_cookies
+    for invalid in ("", "1", "TRUE", "yes", "garbage"):
+        env_values["DEV_INSECURE_COOKIES"] = invalid
+        with pytest.raises(ConfigurationError):
+            load_settings(reveal(env_values))
+    for environment in ("production", "test"):
+        env_values["ENV"] = environment
+        for value in ("true", "false"):
+            env_values["DEV_INSECURE_COOKIES"] = value
+            with pytest.raises(ConfigurationError):
+                load_settings(reveal(env_values))
+        del env_values["DEV_INSECURE_COOKIES"]
+        assert not load_settings(reveal(env_values)).dev_insecure_cookies

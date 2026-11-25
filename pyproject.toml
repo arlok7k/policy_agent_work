@@ -16,6 +16,8 @@ dependencies = [
   "psycopg[binary]==3.3.9",
   "argon2-cffi==25.1.0",
   "uvicorn==0.54.0",
+  "gunicorn==27.0.1",
+  "uvicorn-worker==0.4.0",
   "celery[redis]==5.7.0",
   "redis==8.1.0",
 ]
@@ -52,6 +54,10 @@ addopts = "--strict-markers --tb=short"
 target-version = "py315"
 line-length = 100
 src = ["backend", "scripts"]
+
+# Host-side Compose checks also run on operator/CI Python 3.10+.
+[tool.ruff.per-file-target-version]
+"scripts/check_compose_isolation.py" = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]

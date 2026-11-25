@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,36 @@ from app.users.models import Role, User
 SESSION_COOKIE = "__Host-soc_session"
 CSRF_COOKIE = "__Host-soc_csrf"
 CSRF_HEADER = "X-CSRF-Token"
+DEV_SESSION_COOKIE = "soc_dev_session"
+DEV_CSRF_COOKIE = "soc_dev_csrf"
+
+
+def cookie_names(settings: Settings) -> tuple[str, str]:
+    return (
+        (DEV_SESSION_COOKIE, DEV_CSRF_COOKIE)
+        if settings.dev_insecure_cookies
+        else (
+            SESSION_COOKIE,
+            CSRF_COOKIE,
+        )
+    )
+
+
+def request_session_token(request: Request) -> str | None:
+    settings: Settings = request.app.state.settings
+    return request.cookies.get(cookie_names(settings)[0])
+
+
+def request_csrf_token(request: Request) -> str | None:
+    settings: Settings = request.app.state.settings
+    return request.cookies.get(cookie_names(settings)[1])
+
+
+def session_digest(settings: Settings, token: str) -> bytes:
+    # Insecure dev sessions cannot be replayed in a secure environment even if
+    # an operator accidentally shares the same database and signing secret.
+    purpose = "dev-session" if settings.dev_insecure_cookies else "session"
+    return credential_digest(settings.session_signing_secret, purpose, token)
 
 
 @dataclass(frozen=True)
@@ -30,7 +61,7 @@ class SessionIdentity:
 def session_rows(
     db: Session, settings: Settings, token: str, *, lock: bool = False
 ) -> tuple[AuthSession, User, Role] | None:
-    digest = credential_digest(settings.session_signing_secret, "session", token)
+    digest = session_digest(settings, token)
     query = (
         select(AuthSession, User, Role)
         .join(User, AuthSession.user_id == User.id)

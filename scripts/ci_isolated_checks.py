@@ -51,6 +51,43 @@ async def _relay(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, *, 
                 await upstream.wait_closed()
 
 
+class _RelayTracker:
+    """Keep active bridge tasks alive and close them before loop shutdown."""
+
+    def __init__(self) -> None:
+        self.tasks: set[asyncio.Task[None]] = set()
+        self.failures: list[BaseException] = []
+
+    def accept(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, *, port: int
+    ) -> None:
+        task = asyncio.create_task(_relay(reader, writer, port=port))
+        self.tasks.add(task)
+        task.add_done_callback(self._finished)
+
+    def _finished(self, task: asyncio.Task[None]) -> None:
+        self.tasks.discard(task)
+        if not task.cancelled():
+            error = task.exception()
+            if error is not None:
+                self.failures.append(error)
+
+    async def close(self) -> None:
+        pending = tuple(self.tasks)
+        for task in pending:
+            task.cancel()
+        outcomes = await asyncio.gather(*pending, return_exceptions=True)
+        for outcome in outcomes:
+            if (
+                isinstance(outcome, BaseException)
+                and not isinstance(outcome, asyncio.CancelledError)
+                and outcome not in self.failures
+            ):
+                self.failures.append(outcome)
+        if self.failures:
+            raise RuntimeError(f"Test service bridge failed ({type(self.failures[0]).__name__})")
+
+
 def _assert_no_ip_routing() -> None:
     """A UDP connect performs a local route lookup without sending a packet."""
     destinations = (
@@ -115,10 +152,13 @@ async def _run(args: argparse.Namespace) -> int:
             (cache, args.cache_port),
         )
         servers: list[asyncio.AbstractServer] = []
+        relays = _RelayTracker()
         try:
             for path, port in addresses:
                 servers.append(
-                    await asyncio.start_unix_server(functools.partial(_relay, port=port), path=path)
+                    await asyncio.start_unix_server(
+                        functools.partial(relays.accept, port=port), path=path
+                    )
                 )
             database_url = (
                 f"postgresql+psycopg://{quote(args.database_user, safe='')}@/"
@@ -158,6 +198,7 @@ async def _run(args: argparse.Namespace) -> int:
             for server in servers:
                 server.close()
             await asyncio.gather(*(server.wait_closed() for server in servers))
+            await relays.close()
 
 
 def main() -> int:

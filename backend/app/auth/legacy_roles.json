@@ -1,5 +1,7 @@
 {
   "users": ["admin"],
+  "settings": ["admin"],
+  "presentation_read": ["analyst", "senior_analyst", "admin"],
   "api_keys": ["admin"],
   "alerts_read": ["analyst", "senior_analyst", "admin"],
   "threat_intel": ["analyst", "senior_analyst", "admin"],

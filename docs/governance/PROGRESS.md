@@ -1,6 +1,114 @@
 # Implementation progress
 
-Current phase: **PB3 — response domain completed locally; final-head CI and PR review pending** (PB4 is out of scope)
+**At the PB4 human gate:** The owner selected host isolation for AC-B4.3.
+The isolated Compose stack, real host/internal checks and unchanged browser
+smoke passed in [CI run 45664281012](https://github.com/arlok7k/policy_agent_work/actions/runs/45664281012)
+on `2701953`; see [DR-048](../adr/DR-048.md) and the
+[PB4 Phase Report](PB4_PHASE_REPORT.md). Final-head PR checks and the owner's
+separate baseline approval remain required. P0 has not been authorized.
+
+Current phase: **PB4 — frontend shell and infrastructure** (P0 is out of scope).
+PB3 was merged to `main` as `b9d812e4306bf47841d4ee7c9b0a21f95028c98d`; this
+branch starts at that commit. The unchanged main-branch CI run
+[43669756313](https://github.com/arlok7k/policy_agent_work/actions/runs/43669756313)
+passed its network-isolated backend and audit steps. The prior PB3 final-head
+local run passed 354 tests. The sandbox initially lacked Docker, a browser,
+Python 3.15 and disposable DB/Redis services. Disposable local Python,
+Chromium, PostgreSQL 18.6 and two Redis 8.2.11 instances were subsequently
+provisioned for non-Compose checks; Docker and a container daemon remain absent.
+The first real Compose run failed as described below; after the owner-supplied
+Nginx IPAM fix, [CI run 45268323517](https://github.com/arlok7k/policy_agent_work/actions/runs/45268323517)
+passed Compose startup, health and the backend/frontend jobs. Following two
+separate smoke failures and fixes, the complete real Compose browser smoke and
+all three CI jobs passed in [run 45632988120](https://github.com/arlok7k/policy_agent_work/actions/runs/45632988120)
+on commit `faaa63b`. After the owner-selected host-isolation change, all jobs,
+including the actual host/internal controls and unchanged smoke, passed in
+[run 45664281012](https://github.com/arlok7k/policy_agent_work/actions/runs/45664281012)
+on `2701953`. The final local no-IP backend run passed **413 tests** plus Ruff,
+formatting, mypy and OpenAPI checks. Final-head PR checks must still be green;
+the PB4 owner baseline gate has not been approved. The first isolated baseline reached Ruff,
+but local mypy failed because the locally compiled Python lacked `_sqlite3`.
+After repairing that toolchain, the unchanged backend passed **354 tests**,
+Ruff, mypy and OpenAPI in a namespace verified to have no IP route. The
+merge-head GitHub CI also remains green.
+
+## PB4 task list
+
+| Task | Status | Notes |
+|---|---|---|
+| PB4-T01 | Done | Pinned React/Vite/TypeScript/Tailwind toolchain and hash-integrity lock; [DR-034](../adr/DR-034.md). On Node 26.13.1: ESLint, strict TypeScript, Vitest (1 test) and Vite build passed. The first npm audit identified React Router 6 and minimatch advisories; after moving to Router 7 and a scoped tested minimatch override, the repeat found zero vulnerabilities. |
+| PB4-T02 | Done | Cookie/CSRF same-origin client, `/auth/me` guards, outage/session-expiry handling, RTL/LTR, English/Arabic shell scaffold, accessible navigation and error boundary; [DR-035](../adr/DR-035.md). Node 26 ESLint, strict TypeScript, build and 7 Vitest tests passed. The first lint run flagged unused boundary parameters and a navigation filename; the first type-check flagged an optional test adapter assignment. Both were corrected before the passing repeat. |
+| PB4-T03 | Done | API-backed host pages, explicit placeholders and admin-only audited presentation settings; real command-log and Kill Switch reads plus the owner-authorized read-only presentation projection. [DR-036](../adr/DR-036.md), [DR-037](../adr/DR-037.md). Focused backend suites: 38 passed; full no-IP suite: 358 passed with Ruff, format, mypy and OpenAPI; frontend: 11 tests, lint, type-check and build passed. Vite reports a non-failing large-chunk warning. |
+| PB4-T04 | Done | Reusable captioned table, textual badge, native modal dialog, labelled form field, dismissible toast and pagination primitives, used by host pages; [DR-038](../adr/DR-038.md). An initial type-check caught an unsupported Testing Library `fireEvent.cancel` helper; a real cancel event fixed the test. Later real Chromium testing against local Nginx and a mock upstream exposed focus escaping the native dialog on Tab; cyclic focus containment and a regression test fixed it. Frontend lint, strict type-check, 18 tests, build and the focused real-browser dialog/CSP/XSS checks passed. The latter is not the required Compose smoke. |
+| PB4-FU01 | Implemented and exercised | Explicit exact-IP proxy trust and real-source audit/throttle attribution are implemented and covered by direct/trusted-peer integration tests; [DR-039](../adr/DR-039.md). Full no-IP backend checks passed: Ruff, format, mypy, OpenAPI and 360 tests. Local Nginx/mock-upstream checks verified overwrite; the real Compose smoke passed proxied HTTP traffic, but did not independently assert spoofed-header attribution through Nginx. The first Ruff check found four E501 long lines; formatting resolved three, but the second still failed on one SQL literal. Work halted under the stop rule; the owner selected **“Fix and continue (recommended)”**, and splitting that unchanged literal fixed the repeat. |
+| PB4-FU02 | Implemented and exercised in Compose | Explicit development-only HTTP cookie namespace and domain-separated session digests; production/test reject the flag and retain Secure `__Host-` cookies; [DR-040](../adr/DR-040.md). Full no-IP backend run passed Ruff, format, mypy, OpenAPI and 362 tests, including dev HTTP login/CSRF/approval/logout and replay rejection. Frontend lint, type-check, 17 tests and build passed; development-cookie attributes also passed the real browser smoke in CI run 45632988120. Production Secure cookies are covered by backend tests, not that HTTP smoke. |
+| PB4-T05 | Isolated Compose startup and smoke passed; final-head checks apply | Added pinned backend/frontend images, internal PostgreSQL/Redis networks, non-root services, health checks, restricted runtime-role provisioning and an explicit development-only secret bootstrap; [DR-041](../adr/DR-041.md). Seven focused unit/integration tests passed in a no-IP namespace; an initial full isolated run passed 367 tests but its parent bridge emitted asynchronous teardown diagnostics despite exit 0. PB4-T07 fixed relay lifetime and a later full no-IP run passed 375 tests without those diagnostics. Fresh `npm ci --ignore-scripts` and build passed (after correcting a local scratch-copy command). Real Compose startup and health passed in [CI run 45268323517](https://github.com/arlok7k/policy_agent_work/actions/runs/45268323517); the complete browser smoke later passed in run 45632988120. Isolated-gateway startup, health and the unchanged smoke also passed in run 45664281012. |
+| PB4-T06 | HTTP Compose checks passed; TLS is operator-provisioned | Nginx serves the SPA, proxies `/api/`, overwrites forwarded headers, limits requests and applies CSP/frame/nosniff headers plus TLS-only HSTS; an inactive certificate-free TLS template is supplied. [DR-042](../adr/DR-042.md). Two isolated static tests passed. A locally built Nginx with path/port substitutions and a mock upstream passed syntax, SPA fallback, spoofed-header overwrite, 413 and test-TLS/HSTS checks; real Chromium additionally verified CSP execution blocking, inert hostile text, API-only data calls and dialog behavior. That local browser check is not the Compose smoke. Initial local verification failed on an unsupported OpenSSL option, then revealed non-root `/dev/stderr` reopening was denied; `error_log stderr` and disabled edge access logs corrected it. Real Compose `nginx -t`, health and the HTTP browser security smoke passed in CI run 45632988120. The inactive TLS template was not tested in the official-image Compose stack. |
+| PB4-T07 | All CI jobs passed; final-head checks apply | The nonsecret password-label translation was renamed to resolve a secret-scanner false positive without disabling the scan. Added pinned frontend and Compose jobs while preserving isolated backend checks; [DR-043](../adr/DR-043.md). Fixed the previously observed bridge-task lifetime/teardown diagnostics; the first new exception-propagation test exposed an uncollected completed-task result, which was corrected. The full no-IP run then passed Ruff, formatting, mypy, OpenAPI and 375 tests without bridge diagnostics. A log-redaction test initially encountered the autouse webhook fixture's file; a dedicated empty directory fixed the fixture. In [GitHub CI run 43697058100](https://github.com/arlok7k/policy_agent_work/actions/runs/43697058100), backend and frontend passed and Compose configuration validated, but `docker compose up --build --wait` failed. After PB4-FU03, [run 45268323517](https://github.com/arlok7k/policy_agent_work/actions/runs/45268323517) passed all three jobs before PB4-T08 integrated the smoke. After the smoke and subsequent fixes, [run 45632988120](https://github.com/arlok7k/policy_agent_work/actions/runs/45632988120) passed backend, frontend and real Compose smoke; the PR's final-head checks remain authoritative. |
+| PB4-FU03 | Compose startup verified | Reserve the approved Nginx IP outside Docker's dynamic address pool without changing proxy trust; [DR-044](../adr/DR-044.md). The first new config test failed on the missing allocation range, as expected; after adding the range, Ruff, formatting and seven focused tests passed, including IPv4/IPv6 collision and trust-mismatch mutations. Real Compose startup, Nginx configuration and health then passed in [CI run 45268323517](https://github.com/arlok7k/policy_agent_work/actions/runs/45268323517). |
+| PB4-T08 | Unchanged isolated Compose smoke passed; final-head checks apply | The edge-only Playwright harness and full workflow are in [DR-045](../adr/DR-045.md). Local frontend lint, type-check, 20 Vitest tests and build passed. In [CI run 45272060611](https://github.com/arlok7k/policy_agent_work/actions/runs/45272060611), backend/frontend and Compose startup/health passed, but the smoke timed out after approval with zero matching simulated commands. CI worker logs could not be downloaded from this sandbox. A separate disposable local reproduction reported `NoReferencedTableError` for `response_actions.incident_id` because the standalone worker had not registered the `incidents` mapping; the action remained approved with no command, and Beat recovery reported errors. After PB4-FU04 the unchanged local diagnostic succeeded. In [CI run 45631218996](https://github.com/arlok7k/policy_agent_work/actions/runs/45631218996), the real smoke reached and passed the executed-command checks but failed later when focus was not restored after dismissing the Kill Switch dialog. This progression does not prove the inaccessible earlier CI worker log. PB4-FU05 fixed that separate focus defect; the complete unchanged smoke passed in [CI run 45632988120](https://github.com/arlok7k/policy_agent_work/actions/runs/45632988120), then again on the isolated gateway in [run 45664281012](https://github.com/arlok7k/policy_agent_work/actions/runs/45664281012). No smoke assertion was weakened; final-head PR checks remain authoritative. |
+| PB4-FU04 | Full Compose smoke passed | The owner selected **“PB4-only bootstrap (recommended)”**. [DR-046](../adr/DR-046.md) records the narrow startup adapter and preserves PB3 response logic. The fresh-process metadata regression first failed on the missing incident mapping, then passed; a separate prefork-worker test passed direct L3 dispatch and reconciliation after simulated publication loss. The local API/worker reproduction also passed, and Beat recovered the previously stuck approval. The no-IP backend gate passed Ruff, format, mypy, OpenAPI and 387 tests. Ruff reported the same `E501` on a 101-character test tuple twice; work stopped and the owner selected **“Fix and continue (recommended)”**. Splitting the tuple fixed it. An initial pytest collection also found duplicate test basenames; renaming the new integration file fixed collection without changing assertions. |
+| PB4-FU05 | Full Compose smoke passed | Real Compose smoke run 45631218996 passed command execution, then found that Escape did not restore focus to the Kill Switch trigger. The trigger was removed when the dialog opened, so the existing focus-restoration primitive could not restore it. A focused page regression reproduced the failure. Keeping the trigger mounted and exposing `aria-expanded` fixes the cause without changing the smoke or security logic; Escape, close and cancel regressions pass. Frontend lint, type-check, 23 tests, build and audit pass; the unchanged real-browser focus check passed in CI run 45632988120. Vite retains its non-failing large-chunk warning. |
+| PB4-FU06 | Real isolated Compose checks passed; final-head checks apply | The earlier smoke proved data services unreachable from its edge-only container and reachable from the backend, but did not probe the Docker host. The owner selected **“Isolate host (recommended)”** in [DR-048](../adr/DR-048.md). The data bridge now uses Engine 28+ IPv4 isolated gateway mode with IPv6 disabled; non-destructive preflight rejects incompatible engines and stale mode/IPAM, and post-start checks use actual addresses, backend-positive controls, a published-Nginx host-positive control, and host-negative probes for PostgreSQL and both Redis instances. Existing Nginx trust, edge probe and browser assertions remain unchanged. A focused local run passed 37 tests; the full no-IP run passed 413 tests. An initial deliberately red config test established the missing mode; the first format check exposed Python 3.15-only `except` syntax for a host script documented as Python 3.10+, and a subsequent lint check found a test's deprecated timeout alias. The per-file formatter target and corrected alias resolved those distinct failures. Local Docker is unavailable, but real [CI run 45664281012](https://github.com/arlok7k/policy_agent_work/actions/runs/45664281012) passed engine preflight, isolated startup, host/internal controls, unchanged Playwright smoke and all jobs. Final-head PR checks and the owner gate remain separate. |
+| PB4-FU07 | Deviation disclosed; owner review pending | Migration `009_host_settings` was committed together with PB4-T03 code, not in its own commit as R-17 requires. [DR-047](../adr/DR-047.md) records the error without rewriting pushed history, changing the migration or implying a waiver. The owner must review it at the PB4 gate. |
+| PB4-T09 | Guide verified; final-head checks apply | The operator guide and root README cover disposable Compose startup, non-overwriting secrets, interactive seeding, signed webhook, simulated UI workflow, TLS preparation, tests, network trust and stubs. Configuration now documents the new proxy/cookie and Compose settings. The exact published webhook snippet returned HTTP 202 against a disposable local API and its separate worker stored the alert; it also passes four no-network verifier tests including newline variants. Relative document links resolve. Compose-specific commands and the end-to-end workflow remain subject to real CI, not inferred from the local example. |
+
+### PB4 verification history and gate
+
+The first real Compose attempt was [job 132759868502](https://github.com/arlok7k/policy_agent_work/actions/runs/43697058100/job/132759868502)
+at commit `39c2a724ddd5cca6b609e8a8d0bc21457b08a02a`. The `Build and start the full stack` step failed; the
+health check was skipped, while the redacted diagnostic and cleanup steps ran.
+GitHub reported only exit code 1 through its job metadata. Fetching the detailed
+logs with `gh run view --job 132759868502 --log-failed` returned EOF when the
+sandbox attempted to reach GitHub's log-download host. The owner subsequently
+provided the sanitized error: `failed to set up container networking: Address
+already in use`, occurring when Nginx started. Docker documents reserving static
+addresses outside the automatic IP range; the old configuration had no such
+reservation, though the error alone does not establish which address conflicted.
+PB4-FU03 added the selected reservation without changing proxy trust, and the
+next [CI run 45268323517](https://github.com/arlok7k/policy_agent_work/actions/runs/45268323517)
+passed Compose startup, Nginx configuration, health, backend and frontend jobs.
+The subsequent [CI run 45272060611](https://github.com/arlok7k/policy_agent_work/actions/runs/45272060611)
+started the stack but failed the real Playwright smoke after L3 approval. A
+separate local worker reproduction identified a missing ORM mapping, addressed
+by PB4-FU04; the CI worker log itself was inaccessible. The next
+[run 45631218996](https://github.com/arlok7k/policy_agent_work/actions/runs/45631218996)
+passed the executed-command checks but failed later on modal focus restoration.
+PB4-FU05 addressed that separate UI defect. The next [CI run 45632988120](https://github.com/arlok7k/policy_agent_work/actions/runs/45632988120)
+passed the complete unchanged real Compose smoke and all three jobs, but its
+edge-client check did not prove the Docker-host boundary. The owner selected
+host isolation in [DR-048](../adr/DR-048.md). Local Docker remains unavailable;
+real [CI run 45664281012](https://github.com/arlok7k/policy_agent_work/actions/runs/45664281012)
+subsequently passed isolated-network startup, host-negative and internal-positive
+controls, and the unchanged browser smoke. Final-head CI must be tracked on the
+PR rather than inferred from these earlier results. The owner must still run and
+review the baseline, legacy authorization and open decisions; P0 is not authorized.
+
+The owner selected **“Add minimal endpoints (recommended)”** for the missing
+settings, command-log and Kill Switch read APIs, preserving existing behavior.
+For settings the owner chose **“Presentation settings (recommended)”**:
+admin-only audited display-name and default-direction changes in a new host-only
+table, with no security-policy changes. The owner then selected **“Read-only
+presentation endpoint (recommended)”** so all active users can receive just
+those two presentation values while the administrative settings API remains
+admin-only. For proxy attribution the owner chose
+**“Explicit proxy IP (recommended)”**: only configured proxy addresses are
+trusted and Nginx overwrites forwarded headers. For local cookies the owner chose
+**“Explicit dev-only opt-in (recommended)”**: separate non-Secure cookie names
+only with `ENV=development` and an explicit flag; production rejects the flag.
+The selected visual direction is **“Dark SOC console (recommended)”**. For
+clean-checkout secrets the owner chose **“Development bootstrap (recommended)”**:
+an explicit development-only command will create ignored throwaway random files;
+production secrets remain operator-provisioned. Exact choices and their
+consequences will be recorded in the relevant task DRs. PB4-T03 initially
+reported Ruff line lengths (resolved by formatting), then frontend lint and
+type narrowing issues (corrected); its first full frontend test run failed two
+shell tests because their old mock returned auth data for every newly added
+endpoint. Route-specific mocks fixed the cause and all 11 tests passed.
+
+## PB3 completion record
+
+Current historical phase status: **PB3 — merged**.
 
 PB2 was merged into `main` at `e11c1f0`. Before PB3 and its requested webhook
 follow-up, the CI-equivalent isolated baseline passed **235 tests**, Ruff,
@@ -293,8 +401,8 @@ Security-boundary choices must follow the specification's owner-decision process
 
 | Task | Target | Status | Required outcome |
 |---|---|---|---|
-| PB4-FU01 | PB4 | Not started | Implement a trusted Nginx/proxy boundary so rate limits and audit use the real client IP. Nginx must strip or overwrite externally supplied `X-Forwarded-For` at ingress; the backend may trust forwarding information only from explicitly configured proxy hops. Test legitimate forwarding and spoofed headers both directly and through Nginx. |
-| PB4-FU02 | PB4 | Not started | Define and test a safe local HTTP development cookie flow without weakening production: production session cookies must retain `Secure` and existing protections, and an insecure development setting must not silently apply in production. Document the development boundary and test both environments. |
+| PB4-FU01 | PB4 | Backend implemented; Compose verification pending | Exact-IP proxy trust and audit/throttle attribution passed the isolated backend suite; Nginx must overwrite forwarded headers and real Nginx spoofing verification remains in PB4-T06/T08. |
+| PB4-FU02 | PB4 | Implemented; browser verification pending | Development-only HTTP cookies and production rejection are covered by isolated backend and frontend tests; real Compose browser verification remains PB4-T08. See [DR-040](../adr/DR-040.md). |
 | PB2-PB4-FU01 | PB2/PB4 | Done | Celery Beat schedules bounded, database-time cleanup with a service initiator; active limits and both login/cleanup lock orders are tested. See [DR-022](../adr/DR-022.md). The affected isolated suite passed 65 tests. |
 | P1-FU01 | P1 | Not started | Test the Cedar binding on the pinned CPython 3.15 runtime. If it is unsupported, stop and report options and consequences to the owner before changing Python or binding versions. |
 

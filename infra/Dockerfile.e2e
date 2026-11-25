@@ -1,0 +1,14 @@
+# Test-only image. The browser and system libraries are pinned by the locked
+# Playwright package; it never becomes part of the production Nginx image.
+FROM node:26.13.1-bookworm-slim
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers HOME=/tmp
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --ignore-scripts \
+    && npx playwright install --with-deps chromium \
+    && groupadd --gid 10001 browser \
+    && useradd --uid 10001 --gid browser --no-create-home browser \
+    && chmod -R a+rX /opt/playwright-browsers
+COPY --chown=10001:10001 frontend/ ./
+USER 10001:10001
+CMD ["./node_modules/.bin/playwright", "test"]

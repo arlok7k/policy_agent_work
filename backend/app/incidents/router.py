@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.providers import LLMProvider
 from app.auth.roles import operation_roles, require_operation
-from app.auth.session import SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, request_session_token
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import NotFound, Unavailable
@@ -54,7 +54,7 @@ def create(
             settings,
             pb2,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "incidents_write"),
             body,
             request_peer_ip(request),
@@ -177,7 +177,7 @@ def investigate(
             settings,
             pb2,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "investigate"),
             alert_id,
             body.incident_id,

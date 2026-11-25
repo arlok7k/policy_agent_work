@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth.key_schemas import KeyCreate, KeyIssued, KeyPage
 from app.auth.key_service import create_key, list_keys, revoke_key
 from app.auth.roles import operation_roles, require_operation
-from app.auth.session import SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, request_session_token
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import Unavailable
@@ -37,7 +37,7 @@ def keys_list(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "api_keys"),
             page_size(settings, limit),
             offset,
@@ -58,7 +58,7 @@ def keys_create(
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "api_keys"),
             body,
             request_peer_ip(request),
@@ -77,7 +77,7 @@ def keys_delete(request: Request, identity: KeyAdmin, db: Database, id: UUID) ->
             db,
             settings,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             operation_roles(request, "api_keys"),
             id,
             request_peer_ip(request),

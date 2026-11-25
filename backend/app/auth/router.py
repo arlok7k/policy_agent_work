@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import current_principal, current_user
 from app.auth.schemas import AuthResponse, LoginRequest, PrincipalResponse, ReauthRequest
 from app.auth.service import AuthFailure, LoginSuccess, login, logout, reauthenticate
-from app.auth.session import CSRF_COOKIE, SESSION_COOKIE, SessionIdentity
+from app.auth.session import SessionIdentity, cookie_names, request_session_token
 from app.core.config import Settings
 from app.core.db import get_db
 from app.core.exceptions import Throttled, Unauthenticated, Unavailable
@@ -30,21 +30,23 @@ def _failure(result: AuthFailure) -> NoReturn:
 
 
 def _set_auth_cookies(response: Response, result: LoginSuccess, settings: Settings) -> None:
+    session_cookie, csrf_cookie = cookie_names(settings)
+    secure = not settings.dev_insecure_cookies
     response.set_cookie(
-        SESSION_COOKIE,
+        session_cookie,
         result.session_token,
         max_age=settings.session_ttl_seconds,
         path="/",
-        secure=True,
+        secure=secure,
         httponly=True,
         samesite="strict",
     )
     response.set_cookie(
-        CSRF_COOKIE,
+        csrf_cookie,
         result.csrf_token,
         max_age=settings.session_ttl_seconds,
         path="/",
-        secure=True,
+        secure=secure,
         httponly=False,
         samesite="strict",
     )
@@ -65,7 +67,7 @@ def login_route(
             body.username,
             body.password.get_secret_value(),
             request_peer_ip(request),
-            request.cookies.get(SESSION_COOKIE),
+            request_session_token(request),
         )
     except SQLAlchemyError:
         raise Unavailable() from None
@@ -85,7 +87,7 @@ def me_route(response: Response, principal: CurrentPrincipal) -> AuthResponse:
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout_route(request: Request, identity: CookieSession, db: Database) -> Response:
     settings: Settings = request.app.state.settings
-    token = request.cookies.get(SESSION_COOKIE, "")
+    token = request_session_token(request) or ""
     try:
         revoked = logout(db, settings, token, request_peer_ip(request))
     except SQLAlchemyError:
@@ -95,8 +97,12 @@ def logout_route(request: Request, identity: CookieSession, db: Database) -> Res
     response = Response(
         status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"}
     )
-    response.delete_cookie(SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="strict")
-    response.delete_cookie(CSRF_COOKIE, path="/", secure=True, httponly=False, samesite="strict")
+    session_cookie, csrf_cookie = cookie_names(settings)
+    secure = not settings.dev_insecure_cookies
+    response.delete_cookie(
+        session_cookie, path="/", secure=secure, httponly=True, samesite="strict"
+    )
+    response.delete_cookie(csrf_cookie, path="/", secure=secure, httponly=False, samesite="strict")
     return response
 
 
@@ -112,7 +118,7 @@ def reauth_route(
             settings,
             passwords,
             identity,
-            request.cookies.get(SESSION_COOKIE, ""),
+            request_session_token(request) or "",
             body.password.get_secret_value(),
             request_peer_ip(request),
         )
