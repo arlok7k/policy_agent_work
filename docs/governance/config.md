@@ -7,7 +7,9 @@ starting. Configuration failures do not print supplied values.
 
 | Key | Required | Meaning |
 |---|---|---|
-| `ENV` | Yes | `development`, `test`, or `production`. |
+| `ENV` | Yes | `development`, `test`, or `production`; Compose defaults to `development`. |
+| `DEV_INSECURE_COOKIES` | No | Only `true` or `false`, only with `ENV=development`. `true` enables separate non-Secure development cookie names for local HTTP; when absent the Secure `__Host-` names are used. The flag's presence, even `false`, is rejected in test and production. See [DR-040](../adr/DR-040.md). |
+| `TRUSTED_PROXY_IPS` | No | Comma-separated exact trusted peer IPs; empty or absent trusts none. No CIDRs, wildcards, duplicates, scoped, unspecified or multicast addresses. A trusted peer must provide exactly one valid `X-Forwarded-For` IP; headers from other peers are ignored. Compose fixes this to Nginx's internal IP. See [DR-039](../adr/DR-039.md). |
 | `DATABASE_URL` / `DATABASE_URL_FILE` | Exactly one | SQLAlchemy PostgreSQL URL using `postgresql+psycopg`. The URL may contain credentials and is treated as secret. |
 | `SESSION_SIGNING_SECRET` / `SESSION_SIGNING_SECRET_FILE` | Exactly one | Cryptographically random secret with at least 32 bytes of entropy, supplied by an operator. |
 | `SESSION_TTL_SECONDS` | Yes | Positive session lifetime; example 28800. |
@@ -34,6 +36,19 @@ starting. Configuration failures do not print supplied values.
 | `THROTTLE_CLEANUP_INITIATOR` | Yes | Stable `service:<name>` identity attached to scheduled cleanup tasks. |
 | `CELERY_BROKER_URL` / `CELERY_BROKER_URL_FILE` | Exactly one | Redis broker URL; treated as a secret because it may contain credentials. |
 | `REDIS_CACHE_URL` / `REDIS_CACHE_URL_FILE` | Exactly one | URL of a separate Redis cache instance; treated as a secret. |
+
+Compose also accepts `SOC_BIND_ADDRESS` (default `127.0.0.1`) and
+`SOC_HTTP_PORT` (default `8080`) for the Nginx HTTP publication. The host-side
+`SOC_POSTGRES_PASSWORD_FILE`, `SOC_MIGRATOR_DATABASE_URL_FILE`,
+`SOC_RUNTIME_DATABASE_URL_FILE`, `SOC_WEBHOOK_SECRET_FILE`, and
+`SOC_SESSION_SIGNING_SECRET_FILE` select the five file-backed Compose secrets;
+their defaults are disposable files under `infra/secrets/dev/`. See the
+[operator guide](HPB_README.md) and [secret instructions](../../infra/secrets/README.md).
+`SEED_ADMIN_PASSWORD`, `SEED_SENIOR_ANALYST_PASSWORD` and
+`SEED_ANALYST_PASSWORD` are consumed only by the explicit development seed.
+`SOC_E2E_DISPOSABLE`, `SOC_E2E_INTERNAL_ENDPOINTS` and `SOC_BASE_URL` are
+configured by the disposable end-to-end harness for its test container, not
+production application settings.
 
 The two Redis instances must be provisioned separately; the loader rejects
 identical endpoints but cannot identify every possible DNS alias. Normal
