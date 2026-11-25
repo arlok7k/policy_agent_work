@@ -149,10 +149,10 @@ services:
     environment: *app-environment
     secrets: *app-secrets
     depends_on: *app-dependencies
-    command: ["celery", "-A", "app.jobs.worker:celery", "worker", "--loglevel=INFO", "--concurrency=2", "--hostname=worker@%h"]
+    command: ["celery", "-A", "app.jobs.compose_worker:celery", "worker", "--loglevel=INFO", "--concurrency=2", "--hostname=worker@%h"]
     stop_grace_period: 45s
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.jobs.worker:celery inspect ping --destination worker@$$HOSTNAME --timeout=3 >/dev/null"]
+      test: ["CMD-SHELL", "celery -A app.jobs.compose_worker:celery inspect ping --destination worker@$$HOSTNAME --timeout=3 >/dev/null"]
       interval: 30s
       timeout: 8s
       retries: 5
@@ -163,9 +163,9 @@ services:
     environment: *app-environment
     secrets: *app-secrets
     depends_on: *app-dependencies
-    command: ["celery", "-A", "app.jobs.worker:celery", "beat", "--loglevel=INFO", "--enable-remote-control", "--hostname=beat@%h", "--schedule=/tmp/celerybeat-schedule"]
+    command: ["celery", "-A", "app.jobs.compose_worker:celery", "beat", "--loglevel=INFO", "--enable-remote-control", "--hostname=beat@%h", "--schedule=/tmp/celerybeat-schedule"]
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.jobs.worker:celery inspect ping --destination beat@$$HOSTNAME --timeout=3 >/dev/null"]
+      test: ["CMD-SHELL", "celery -A app.jobs.compose_worker:celery inspect ping --destination beat@$$HOSTNAME --timeout=3 >/dev/null"]
       interval: 30s
       timeout: 8s
       retries: 5

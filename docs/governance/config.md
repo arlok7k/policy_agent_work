@@ -40,16 +40,22 @@ identical endpoints but cannot identify every possible DNS alias. Normal
 `redis://`/`rediss://` URLs are supported, as are `redis+socket:///...` for the
 broker and `unix:///...` for the cache. The application validates PB2 settings
 at startup but does not claim Redis readiness until a request actually uses it.
-The PB4 infrastructure has not yet been built. Start a worker with the same
-required settings and restricted database login as the API:
-`PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery worker -Q default`.
+Compose starts a worker and Beat using the PB4 deployment entrypoint. For manual
+startup, use the same entrypoint, required settings and restricted database login
+as the API:
+`PYTHONPATH=backend <venv>/bin/celery -A app.jobs.compose_worker:celery worker -Q default`.
 Start one Beat process with the same configuration and a durable writable schedule
 file, for example:
 
 ```sh
-PYTHONPATH=backend <venv>/bin/celery -A app.jobs.worker:celery beat \
+PYTHONPATH=backend <venv>/bin/celery -A app.jobs.compose_worker:celery beat \
   --schedule=/var/lib/smart-soc/celerybeat-schedule
 ```
+
+Do not use the original `app.jobs.worker:celery` entrypoint for a standalone
+worker: it does not register all response-action ORM foreign-key mappings.
+The PB4 entrypoint registers the existing incident model without changing the
+underlying response logic; see [DR-046](../adr/DR-046.md).
 
 Provision that directory outside the repository. All API and worker replicas must share an identical
 `LOGIN_WINDOW_SECONDS`; see [DR-022](../adr/DR-022.md) for the cleanup's locking,
